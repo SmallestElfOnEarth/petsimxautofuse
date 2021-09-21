@@ -1,6 +1,10 @@
 --[[ Made by iOwn_You#0622 for Pet Sim X (21/9/2021)
  Credit to Jaquavious (Gerard) for the UID to pet convetor
  ]]--
+ 
+ _G.PowerSwitch = false
+_G.TypeOfPet = "Rainbow"
+_G.FuseCombo = _G.CompPresetRB
 
 _lE9lFEv9ThDXNtDd, Protected_by_MoonSecV2, Discord = 'discord.gg/gQEH2uZxUk'
 
