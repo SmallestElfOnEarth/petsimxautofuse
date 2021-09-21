@@ -2,6 +2,7 @@
  Credit to Jaquavious (Gerard) for the UID to pet convetor
  ]]--
  
+ warn("AUTO FUSE LOADED, DO NOT EXECUTE AGAIN!")
  _G.PowerSwitch = false
 _G.TypeOfPet = "Rainbow"
 _G.FuseCombo = _G.CompPresetRB
