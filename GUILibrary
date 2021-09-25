@@ -1,1080 +1,1080 @@
 local library = {count = 0, queue = {}, callbacks = {}, rainbowtable = {}, toggled = true, binds = {}};
 local defaults; do
-	local dragger = {}; do
-		local mouse        = game:GetService("Players").LocalPlayer:GetMouse();
-		local inputService = game:GetService('UserInputService');
-		local heartbeat    = game:GetService("RunService").Heartbeat;
-		-- // credits to Ririchi / Inori for this cute drag function :)
-		function dragger.new(frame)
-			local s, event = pcall(function()
-				return frame.MouseEnter
-			end)
-
-			if s then
-				frame.Active = true;
-
-				event:connect(function()
-					local input = frame.InputBegan:connect(function(key)
-						if key.UserInputType == Enum.UserInputType.MouseButton1 then
-							local objectPosition = Vector2.new(mouse.X - frame.AbsolutePosition.X, mouse.Y - frame.AbsolutePosition.Y);
-							while heartbeat:wait() and inputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) do
-								pcall(function()
-									frame:TweenPosition(UDim2.new(0, mouse.X - objectPosition.X + (frame.Size.X.Offset * frame.AnchorPoint.X), 0, mouse.Y - objectPosition.Y + (frame.Size.Y.Offset * frame.AnchorPoint.Y)), 'Out', 'Linear', 0.1, true);
-								end)
-							end
-						end
-					end)
-
-					local leave;
-					leave = frame.MouseLeave:connect(function()
-						input:disconnect();
-						leave:disconnect();
-					end)
-				end)
-			end
-		end
-
-		game:GetService('UserInputService').InputBegan:connect(function(key, gpe)
-			if (not gpe) then
-				if key.KeyCode == Enum.KeyCode.RightControl then
-					library.toggled = not library.toggled;
-					for i, data in next, library.queue do
-						local pos = (library.toggled and data.p or UDim2.new(-1, 0, -0.5,0))
-						data.w:TweenPosition(pos, (library.toggled and 'Out' or 'In'), 'Quad', 0.15, true)
-						wait();
-					end
-				end
-			end
-		end)
-	end
-
-	local types = {}; do
-		types.__index = types;
-		function types.window(name, options)
-			library.count = library.count + 1
-			local newWindow = library:Create('Frame', {
-				Name = name;
-				Size = UDim2.new(0, 190, 0, 30);
-				BackgroundColor3 = options.topcolor;
-				BorderSizePixel = 0;
-				Parent = library.container;
-				Position = UDim2.new(0, (15 + (200 * library.count) - 200), 0, 0);
-				ZIndex = 3;
-				library:Create('TextLabel', {
-					Text = name;
-					Size = UDim2.new(1, -10, 1, 0);
-					Position = UDim2.new(0, 5, 0, 0);
-					BackgroundTransparency = 1;
-					Font = Enum.Font.Code;
-					TextSize = options.titlesize;
-					Font = options.titlefont;
-					TextColor3 = options.titletextcolor;
-					TextStrokeTransparency = library.options.titlestroke;
-					TextStrokeColor3 = library.options.titlestrokecolor;
-					ZIndex = 3;
-				});
-				library:Create("TextButton", {
-					Size = UDim2.new(0, 30, 0, 30);
-					Position = UDim2.new(1, -35, 0, 0);
-					BackgroundTransparency = 1;
-					Text = "-";
-					TextSize = options.titlesize;
-					Font = options.titlefont;--Enum.Font.Code;
-					Name = 'window_toggle';
-					TextColor3 = options.titletextcolor;
-					TextStrokeTransparency = library.options.titlestroke;
-					TextStrokeColor3 = library.options.titlestrokecolor;
-					ZIndex = 3;
-				});
-				library:Create("Frame", {
-					Name = 'Underline';
-					Size = UDim2.new(1, 0, 0, 2);
-					Position = UDim2.new(0, 0, 1, -2);
-					BackgroundColor3 = (options.underlinecolor ~= "rainbow" and options.underlinecolor or Color3.new());
-					BorderSizePixel = 0;
-					ZIndex = 3;
-				});
-				library:Create('Frame', {
-					Name = 'container';
-					Position = UDim2.new(0, 0, 1, 0);
-					Size = UDim2.new(1, 0, 0, 0);
-					BorderSizePixel = 0;
-					BackgroundColor3 = options.bgcolor;
-					ClipsDescendants = false;
-					library:Create('UIListLayout', {
-						Name = 'List';
-						SortOrder = Enum.SortOrder.LayoutOrder;
-					})
-				});
-			})
-
-			if options.underlinecolor == "rainbow" then
-				table.insert(library.rainbowtable, newWindow:FindFirstChild('Underline'))
-			end
-
-			local window = setmetatable({
-				count = 0;
-				object = newWindow;
-				container = newWindow.container;
-				toggled = true;
-				flags   = {};
-
-			}, types)
-
-			table.insert(library.queue, {
-				w = window.object;
-				p = window.object.Position;
-			})
-
-			newWindow:FindFirstChild("window_toggle").MouseButton1Click:connect(function()
-				window.toggled = not window.toggled;
-				newWindow:FindFirstChild("window_toggle").Text = (window.toggled and "+" or "-")
-				if (not window.toggled) then
-					window.container.ClipsDescendants = true;
-				end
-				wait();
-				local y = 0;
-				for i, v in next, window.container:GetChildren() do
-					if (not v:IsA('UIListLayout')) then
-						y = y + v.AbsoluteSize.Y;
-					end
-				end 
-
-				local targetSize = window.toggled and UDim2.new(1, 0, 0, y+5) or UDim2.new(1, 0, 0, 0);
-				local targetDirection = window.toggled and "In" or "Out"
-
-				window.container:TweenSize(targetSize, targetDirection, "Quad", 0.15, true)
-				wait(.15)
-				if window.toggled then
-					window.container.ClipsDescendants = false;
-				end
-			end)
-
-			return window;
-		end
-
-		function types:Resize()
-			local y = 0;
-			for i, v in next, self.container:GetChildren() do
-				if (not v:IsA('UIListLayout')) then
-					y = y + v.AbsoluteSize.Y;
-				end
-			end 
-			self.container.Size = UDim2.new(1, 0, 0, y+5)
-		end
-
-		function types:GetOrder() 
-			local c = 0;
-			for i, v in next, self.container:GetChildren() do
-				if (not v:IsA('UIListLayout')) then
-					c = c + 1
-				end
-			end
-			return c
-		end
-
-		function types:Label(text)
-			local v = game:GetService'TextService':GetTextSize(text, 18, Enum.Font.SourceSans, Vector2.new(math.huge, math.huge))
-			local object = library:Create('Frame', {
-				Size = UDim2.new(1, 0, 0, v.Y + 5);
-				BackgroundTransparency  = 1;
-				library:Create('TextLabel', {
-					Size = UDim2.new(1, 0, 1, 0);
-					Position = UDim2.new(0, 10, 0, 0);
-					LayoutOrder = self:GetOrder();
-
-					Text = text;
-					TextSize = 18;
-					Font = Enum.Font.SourceSans;
-					TextColor3 = Color3.fromRGB(255, 255, 255);
-					BackgroundTransparency = 1;
-					TextXAlignment = Enum.TextXAlignment.Left;
-					TextWrapped = true;
-				});
-				Parent = self.container
-			})
-			self:Resize();
-		end
-
-		function types:Toggle(name, options, callback)
-			local default  = options.default or false;
-			local location = options.location or self.flags;
-			local flag     = options.flag or "";
-			local callback = callback or function() end;
-
-			location[flag] = default;
-
-			local check = library:Create('Frame', {
-				BackgroundTransparency = 1;
-				Size = UDim2.new(1, 0, 0, 25);
-				LayoutOrder = self:GetOrder();
-				library:Create('TextLabel', {
-					Name = name;
-					Text = "\r" .. name;
-					BackgroundTransparency = 1;
-					TextColor3 = library.options.textcolor;
-					Position = UDim2.new(0, 5, 0, 0);
-					Size     = UDim2.new(1, -5, 1, 0);
-					TextXAlignment = Enum.TextXAlignment.Left;
-					Font = library.options.font;
-					TextSize = library.options.fontsize;
-					TextStrokeTransparency = library.options.textstroke;
-					TextStrokeColor3 = library.options.strokecolor;
-					library:Create('TextButton', {
-						Text = (location[flag] and utf8.char(10003) or "");
-						Font = library.options.font;
-						TextSize = library.options.fontsize;
-						Name = 'Checkmark';
-						Size = UDim2.new(0, 20, 0, 20);
-						Position = UDim2.new(1, -25, 0, 4);
-						TextColor3 = library.options.textcolor;
-						BackgroundColor3 = library.options.bgcolor;
-						BorderColor3 = library.options.bordercolor;
-						TextStrokeTransparency = library.options.textstroke;
-						TextStrokeColor3 = library.options.strokecolor;
-					})
-				});
-				Parent = self.container;
-			});
-
-			local function click(t)
-				location[flag] = not location[flag];
-				check:FindFirstChild(name).Checkmark.Text = location[flag] and utf8.char(10003) or "";
-				callback(location[flag])
-			end
-
-			check:FindFirstChild(name).Checkmark.MouseButton1Click:connect(click)
-			library.callbacks[flag] = click;
-
-			if location[flag] == true then
-				callback(location[flag])
-			end
-
-			self:Resize();
-			return {
-				Set = function(self, b)
-					location[flag] = b;
-					callback(location[flag])
-					check:FindFirstChild(name).Checkmark.Text = location[flag] and utf8.char(10003) or "";
-				end
-			}
-		end
-
-		function types:Button(name, callback)
-			callback = callback or function() end;
-
-			local check = library:Create('Frame', {
-				BackgroundTransparency = 1;
-				Size = UDim2.new(1, 0, 0, 25);
-				LayoutOrder = self:GetOrder();
-				library:Create('TextButton', {
-					Name = name;
-					Text = name;
-					BackgroundColor3 = library.options.btncolor;
-					BorderColor3 = library.options.bordercolor;
-					TextStrokeTransparency = library.options.textstroke;
-					TextStrokeColor3 = library.options.strokecolor;
-					TextColor3 = library.options.textcolor;
-					Position = UDim2.new(0, 5, 0, 5);
-					Size     = UDim2.new(1, -10, 0, 20);
-					Font = library.options.font;
-					TextSize = library.options.fontsize;
-				});
-				Parent = self.container;
-			});
-
-			check:FindFirstChild(name).MouseButton1Click:connect(callback)
-			self:Resize();
-
-			return {
-				Fire = function()
-					callback();
-				end
-			}
-		end
-
-		function types:Box(name, options, callback) --type, default, data, location, flag)
-			local type   = options.type or "";
-			local default = options.default or "";
-			local data = options.data
-			local location = options.location or self.flags;
-			local flag     = options.flag or "";
-			local callback = callback or function() end;
-			local min      = options.min or 0;
-			local max      = options.max or 9e9;
-
-			if type == 'number' and (not tonumber(default)) then
-				location[flag] = default;
-			else
-				location[flag] = "";
-				default = "";
-			end
-
-			local check = library:Create('Frame', {
-				BackgroundTransparency = 1;
-				Size = UDim2.new(1, 0, 0, 25);
-				LayoutOrder = self:GetOrder();
-				library:Create('TextLabel', {
-					Name = name;
-					Text = "\r" .. name;
-					BackgroundTransparency = 1;
-					TextColor3 = library.options.textcolor;
-					TextStrokeTransparency = library.options.textstroke;
-					TextStrokeColor3 = library.options.strokecolor;
-					Position = UDim2.new(0, 5, 0, 0);
-					Size     = UDim2.new(1, -5, 1, 0);
-					TextXAlignment = Enum.TextXAlignment.Left;
-					Font = library.options.font;
-					TextSize = library.options.fontsize;
-					library:Create('TextBox', {
-						TextStrokeTransparency = library.options.textstroke;
-						TextStrokeColor3 = library.options.strokecolor;
-						Text = tostring(default);
-						Font = library.options.font;
-						TextSize = library.options.fontsize;
-						Name = 'Box';
-						Size = UDim2.new(0, 60, 0, 20);
-						Position = UDim2.new(1, -65, 0, 3);
-						TextColor3 = library.options.textcolor;
-						BackgroundColor3 = library.options.boxcolor;
-						BorderColor3 = library.options.bordercolor;
-						PlaceholderColor3 = library.options.placeholdercolor;
-					})
-				});
-				Parent = self.container;
-			});
-
-			local box = check:FindFirstChild(name):FindFirstChild('Box');
-			box.FocusLost:connect(function(e)
-				local old = location[flag];
-				if type == "number" then
-					local num = tonumber(box.Text)
-					if (not num) then
-						box.Text = tonumber(location[flag])
-					else
-						location[flag] = math.clamp(num, min, max)
-						box.Text = tonumber(location[flag])
-					end
-				else
-					location[flag] = tostring(box.Text)
-				end
-
-				callback(location[flag], old, e)
-			end)
-
-			if type == 'number' then
-				box:GetPropertyChangedSignal('Text'):connect(function()
-					box.Text = string.gsub(box.Text, "[%a+]", "");
-				end)
-			end
-
-			self:Resize();
-			return box
-		end
-
-		function types:Bind(name, options, callback)
-			local location     = options.location or self.flags;
-			local keyboardOnly = options.kbonly or false
-			local flag         = options.flag or "";
-			local callback     = callback or function() end;
-			local default      = options.default;
-
-			if keyboardOnly and (not tostring(default):find('MouseButton')) then
-				location[flag] = default
-			end
-
-			local banned = {
-				Return = true;
-				Space = true;
-				Tab = true;
-				Unknown = true;
-			}
-
-			local shortNames = {
-				RightControl = 'RightCtrl';
-				LeftControl = 'LeftCtrl';
-				LeftShift = 'LShift';
-				RightShift = 'RShift';
-				MouseButton1 = "Mouse1";
-				MouseButton2 = "Mouse2";
-			}
-
-			local allowed = {
-				MouseButton1 = true;
-				MouseButton2 = true;
-			}      
-
-			local nm = (default and (shortNames[default.Name] or default.Name) or "None");
-			local check = library:Create('Frame', {
-				BackgroundTransparency = 1;
-				Size = UDim2.new(1, 0, 0, 30);
-				LayoutOrder = self:GetOrder();
-				library:Create('TextLabel', {
-					Name = name;
-					Text = "\r" .. name;
-					BackgroundTransparency = 1;
-					TextColor3 = library.options.textcolor;
-					Position = UDim2.new(0, 5, 0, 0);
-					Size     = UDim2.new(1, -5, 1, 0);
-					TextXAlignment = Enum.TextXAlignment.Left;
-					Font = library.options.font;
-					TextSize = library.options.fontsize;
-					TextStrokeTransparency = library.options.textstroke;
-					TextStrokeColor3 = library.options.strokecolor;
-					BorderColor3     = library.options.bordercolor;
-					BorderSizePixel  = 1;
-					library:Create('TextButton', {
-						Name = 'Keybind';
-						Text = nm;
-						TextStrokeTransparency = library.options.textstroke;
-						TextStrokeColor3 = library.options.strokecolor;
-						Font = library.options.font;
-						TextSize = library.options.fontsize;
-						Size = UDim2.new(0, 60, 0, 20);
-						Position = UDim2.new(1, -65, 0, 5);
-						TextColor3 = library.options.textcolor;
-						BackgroundColor3 = library.options.bgcolor;
-						BorderColor3     = library.options.bordercolor;
-						BorderSizePixel  = 1;
-					})
-				});
-				Parent = self.container;
-			});
-
-			local button = check:FindFirstChild(name).Keybind;
-			button.MouseButton1Click:connect(function()
-				library.binding = true
-
-				button.Text = "..."
-				local a, b = game:GetService('UserInputService').InputBegan:wait();
-				local name = tostring(a.KeyCode.Name);
-				local typeName = tostring(a.UserInputType.Name);
-
-				if (a.UserInputType ~= Enum.UserInputType.Keyboard and (allowed[a.UserInputType.Name]) and (not keyboardOnly)) or (a.KeyCode and (not banned[a.KeyCode.Name])) then
-					local name = (a.UserInputType ~= Enum.UserInputType.Keyboard and a.UserInputType.Name or a.KeyCode.Name);
-					location[flag] = (a);
-					button.Text = shortNames[name] or name;
-
-				else
-					if (location[flag]) then
-						if (not pcall(function()
-								return location[flag].UserInputType
-							end)) then
-							local name = tostring(location[flag])
-							button.Text = shortNames[name] or name
-						else
-							local name = (location[flag].UserInputType ~= Enum.UserInputType.Keyboard and location[flag].UserInputType.Name or location[flag].KeyCode.Name);
-							button.Text = shortNames[name] or name;
-						end
-					end
-				end
-
-				wait(0.1)  
-				library.binding = false;
-			end)
-
-			if location[flag] then
-				button.Text = shortNames[tostring(location[flag].Name)] or tostring(location[flag].Name)
-			end
-
-			library.binds[flag] = {
-				location = location;
-				callback = callback;
-			};
-
-			self:Resize();
-		end
-
-		function types:Section(name)
-			local order = self:GetOrder();
-			local determinedSize = UDim2.new(1, 0, 0, 25)
-			local determinedPos = UDim2.new(0, 0, 0, 4);
-			local secondarySize = UDim2.new(1, 0, 0, 20);
-
-			if order == 0 then
-				determinedSize = UDim2.new(1, 0, 0, 21)
-				determinedPos = UDim2.new(0, 0, 0, -1);
-				secondarySize = nil
-			end
-
-			local check = library:Create('Frame', {
-				Name = 'Section';
-				BackgroundTransparency = 1;
-				Size = determinedSize;
-				BackgroundColor3 = library.options.sectncolor;
-				BorderSizePixel = 0;
-				LayoutOrder = order;
-				library:Create('TextLabel', {
-					Name = 'section_lbl';
-					Text = name;
-					BackgroundTransparency = 0;
-					BorderSizePixel = 0;
-					BackgroundColor3 = library.options.sectncolor;
-					TextColor3 = library.options.textcolor;
-					Position = determinedPos;
-					Size     = (secondarySize or UDim2.new(1, 0, 1, 0));
-					Font = library.options.font;
-					TextSize = library.options.fontsize;
-					TextStrokeTransparency = library.options.textstroke;
-					TextStrokeColor3 = library.options.strokecolor;
-				});
-				Parent = self.container;
-			});
-
-			self:Resize();
-		end
-
-		function types:Slider(name, options, callback)
-			local default = options.default or options.min;
-			local min     = options.min or 0;
-			local max      = options.max or 1;
-			local location = options.location or self.flags;
-			local precise  = options.precise  or false -- e.g 0, 1 vs 0, 0.1, 0.2, ...
-			local flag     = options.flag or "";
-			local callback = callback or function() end
-
-			location[flag] = default;
-
-			local check = library:Create('Frame', {
-				BackgroundTransparency = 1;
-				Size = UDim2.new(1, 0, 0, 25);
-				LayoutOrder = self:GetOrder();
-				library:Create('TextLabel', {
-					Name = name;
-					TextStrokeTransparency = library.options.textstroke;
-					TextStrokeColor3 = library.options.strokecolor;
-					Text = "\r" .. name;
-					BackgroundTransparency = 1;
-					TextColor3 = library.options.textcolor;
-					Position = UDim2.new(0, 5, 0, 2);
-					Size     = UDim2.new(1, -5, 1, 0);
-					TextXAlignment = Enum.TextXAlignment.Left;
-					Font = library.options.font;
-					TextSize = library.options.fontsize;
-					library:Create('Frame', {
-						Name = 'Container';
-						Size = UDim2.new(0, 60, 0, 20);
-						Position = UDim2.new(1, -65, 0, 3);
-						BackgroundTransparency = 1;
-						--BorderColor3 = library.options.bordercolor;
-						BorderSizePixel = 0;
-						library:Create('TextLabel', {
-							Name = 'ValueLabel';
-							Text = default;
-							BackgroundTransparency = 1;
-							TextColor3 = library.options.textcolor;
-							Position = UDim2.new(0, -10, 0, 0);
-							Size     = UDim2.new(0, 1, 1, 0);
-							TextXAlignment = Enum.TextXAlignment.Right;
-							Font = library.options.font;
-							TextSize = library.options.fontsize;
-							TextStrokeTransparency = library.options.textstroke;
-							TextStrokeColor3 = library.options.strokecolor;
-						});
-						library:Create('TextButton', {
-							Name = 'Button';
-							Size = UDim2.new(0, 5, 1, -2);
-							Position = UDim2.new(0, 0, 0, 1);
-							AutoButtonColor = false;
-							Text = "";
-							BackgroundColor3 = Color3.fromRGB(20, 20, 20);
-							BorderSizePixel = 0;
-							ZIndex = 2;
-							TextStrokeTransparency = library.options.textstroke;
-							TextStrokeColor3 = library.options.strokecolor;
-						});
-						library:Create('Frame', {
-							Name = 'Line';
-							BackgroundTransparency = 0;
-							Position = UDim2.new(0, 0, 0.5, 0);
-							Size     = UDim2.new(1, 0, 0, 1);
-							BackgroundColor3 = Color3.fromRGB(255, 255, 255);
-							BorderSizePixel = 0;
-						});
-					})
-				});
-				Parent = self.container;
-			});
-
-			local overlay = check:FindFirstChild(name);
-
-			local renderSteppedConnection;
-			local inputBeganConnection;
-			local inputEndedConnection;
-			local mouseLeaveConnection;
-			local mouseDownConnection;
-			local mouseUpConnection;
-
-			check:FindFirstChild(name).Container.MouseEnter:connect(function()
-				local function update()
-					if renderSteppedConnection then renderSteppedConnection:disconnect() end 
-
-
-					renderSteppedConnection = game:GetService('RunService').RenderStepped:connect(function()
-						local mouse = game:GetService("UserInputService"):GetMouseLocation()
-						local percent = (mouse.X - overlay.Container.AbsolutePosition.X) / (overlay.Container.AbsoluteSize.X)
-						percent = math.clamp(percent, 0, 1)
-						percent = tonumber(string.format("%.2f", percent))
-
-						overlay.Container.Button.Position = UDim2.new(math.clamp(percent, 0, 0.99), 0, 0, 1)
-
-						local num = min + (max - min) * percent
-						local value = (precise and num or math.floor(num))
-
-						overlay.Container.ValueLabel.Text = value;
-						callback(tonumber(value))
-						location[flag] = tonumber(value)
-					end)
-				end
-
-				local function disconnect()
-					if renderSteppedConnection then renderSteppedConnection:disconnect() end
-					if inputBeganConnection then inputBeganConnection:disconnect() end
-					if inputEndedConnection then inputEndedConnection:disconnect() end
-					if mouseLeaveConnection then mouseLeaveConnection:disconnect() end
-					if mouseUpConnection then mouseUpConnection:disconnect() end
-				end
-
-				inputBeganConnection = check:FindFirstChild(name).Container.InputBegan:connect(function(input)
-					if input.UserInputType == Enum.UserInputType.MouseButton1 then
-						update()
-					end
-				end)
-
-				inputEndedConnection = check:FindFirstChild(name).Container.InputEnded:connect(function(input)
-					if input.UserInputType == Enum.UserInputType.MouseButton1 then
-						disconnect()
-					end
-				end)
-
-				mouseDownConnection = check:FindFirstChild(name).Container.Button.MouseButton1Down:connect(update)
-				mouseUpConnection   = game:GetService("UserInputService").InputEnded:connect(function(a, b)
-					if a.UserInputType == Enum.UserInputType.MouseButton1 and (mouseDownConnection.Connected) then
-						disconnect()
-					end
-				end)
-			end)    
-
-			if default ~= min then
-				local percent = 1 - ((max - default) / (max - min))
-				local number  = default 
-
-				number = tonumber(string.format("%.2f", number))
-				if (not precise) then
-					number = math.floor(number)
-				end
-
-				overlay.Container.Button.Position  = UDim2.new(math.clamp(percent, 0, 0.99), 0,  0, 1) 
-				overlay.Container.ValueLabel.Text  = number
-			end
-
-			self:Resize();
-			return {
-				Set = function(self, value)
-					local percent = 1 - ((max - value) / (max - min))
-					local number  = value 
-
-					number = tonumber(string.format("%.2f", number))
-					if (not precise) then
-						number = math.floor(number)
-					end
-
-					overlay.Container.Button.Position  = UDim2.new(math.clamp(percent, 0, 0.99), 0,  0, 1) 
-					overlay.Container.ValueLabel.Text  = number
-					location[flag] = number
-					callback(number)
-				end
-			}
-		end 
-
-		function types:SearchBox(text, options, callback)
-			local list = options.list or {};
-			local flag = options.flag or "";
-			local location = options.location or self.flags;
-			local callback = callback or function() end;
-
-			local busy = false;
-			local box = library:Create('Frame', {
-				BackgroundTransparency = 1;
-				Size = UDim2.new(1, 0, 0, 25);
-				LayoutOrder = self:GetOrder();
-				library:Create('TextBox', {
-					Text = "";
-					PlaceholderText = text;
-					PlaceholderColor3 = Color3.fromRGB(60, 60, 60);
-					Font = library.options.font;
-					TextSize = library.options.fontsize;
-					Name = 'Box';
-					Size = UDim2.new(1, -10, 0, 20);
-					Position = UDim2.new(0, 5, 0, 4);
-					TextColor3 = library.options.textcolor;
-					BackgroundColor3 = library.options.dropcolor;
-					BorderColor3 = library.options.bordercolor;
-					TextStrokeTransparency = library.options.textstroke;
-					TextStrokeColor3 = library.options.strokecolor;
-					library:Create('ScrollingFrame', {
-						Position = UDim2.new(0, 0, 1, 1);
-						Name = 'Container';
-						BackgroundColor3 = library.options.btncolor;
-						ScrollBarThickness = 0;
-						BorderSizePixel = 0;
-						BorderColor3 = library.options.bordercolor;
-						Size = UDim2.new(1, 0, 0, 0);
-						library:Create('UIListLayout', {
-							Name = 'ListLayout';
-							SortOrder = Enum.SortOrder.LayoutOrder;
-						});
-						ZIndex = 2;
-					});
-				});
-				Parent = self.container;
-			})
-
-			local function rebuild(text)
-				box:FindFirstChild('Box').Container.ScrollBarThickness = 0
-				for i, child in next, box:FindFirstChild('Box').Container:GetChildren() do
-					if (not child:IsA('UIListLayout')) then
-						child:Destroy();
-					end
-				end
-
-				if #text > 0 then
-					for i, v in next, list do
-						if string.sub(string.lower(v), 1, string.len(text)) == string.lower(text) then
-							local button = library:Create('TextButton', {
-								Text = v;
-								Font = library.options.font;
-								TextSize = library.options.fontsize;
-								TextColor3 = library.options.textcolor;
-								BorderColor3 = library.options.bordercolor;
-								TextStrokeTransparency = library.options.textstroke;
-								TextStrokeColor3 = library.options.strokecolor;
-								Parent = box:FindFirstChild('Box').Container;
-								Size = UDim2.new(1, 0, 0, 20);
-								LayoutOrder = i;
-								BackgroundColor3 = library.options.btncolor;
-								ZIndex = 2;
-							})
-
-							button.MouseButton1Click:connect(function()
-								busy = true;
-								box:FindFirstChild('Box').Text = button.Text;
-								wait();
-								busy = false;
-
-								location[flag] = button.Text;
-								callback(location[flag])
-
-								box:FindFirstChild('Box').Container.ScrollBarThickness = 0
-								for i, child in next, box:FindFirstChild('Box').Container:GetChildren() do
-									if (not child:IsA('UIListLayout')) then
-										child:Destroy();
-									end
-								end
-								box:FindFirstChild('Box').Container:TweenSize(UDim2.new(1, 0, 0, 0), 'Out', 'Quad', 0.25, true)
-							end)
-						end
-					end
-				end
-
-				local c = box:FindFirstChild('Box').Container:GetChildren()
-				local ry = (20 * (#c)) - 20
-
-				local y = math.clamp((20 * (#c)) - 20, 0, 100)
-				if ry > 100 then
-					box:FindFirstChild('Box').Container.ScrollBarThickness = 5;
-				end
-
-				box:FindFirstChild('Box').Container:TweenSize(UDim2.new(1, 0, 0, y), 'Out', 'Quad', 0.25, true)
-				box:FindFirstChild('Box').Container.CanvasSize = UDim2.new(1, 0, 0, (20 * (#c)) - 20)
-			end
-
-			box:FindFirstChild('Box'):GetPropertyChangedSignal('Text'):connect(function()
-				if (not busy) then
-					rebuild(box:FindFirstChild('Box').Text)
-				end
-			end);
-
-			local function reload(new_list)
-				list = new_list;
-				rebuild("")
-			end
-			self:Resize();
-			return reload, box:FindFirstChild('Box');
-		end
-
-		function types:Dropdown(name, options, callback)
-			local location = options.location or self.flags;
-			local flag = options.flag or "";
-			local callback = callback or function() end;
-			local list = options.list or {};
-
-			location[flag] = list[1]
-			local check = library:Create('Frame', {
-				BackgroundTransparency = 1;
-				Size = UDim2.new(1, 0, 0, 25);
-				BackgroundColor3 = Color3.fromRGB(25, 25, 25);
-				BorderSizePixel = 0;
-				LayoutOrder = self:GetOrder();
-				library:Create('Frame', {
-					Name = 'dropdown_lbl';
-					BackgroundTransparency = 0;
-					BackgroundColor3 = library.options.dropcolor;
-					Position = UDim2.new(0, 5, 0, 4);
-					BorderColor3 = library.options.bordercolor;
-					Size     = UDim2.new(1, -10, 0, 20);
-					library:Create('TextLabel', {
-						Name = 'Selection';
-						Size = UDim2.new(1, 0, 1, 0);
-						Text = list[1];
-						TextColor3 = library.options.textcolor;
-						BackgroundTransparency = 1;
-						Font = library.options.font;
-						TextSize = library.options.fontsize;
-						TextStrokeTransparency = library.options.textstroke;
-						TextStrokeColor3 = library.options.strokecolor;
-					});
-					library:Create("TextButton", {
-						Name = 'drop';
-						BackgroundTransparency = 1;
-						Size = UDim2.new(0, 20, 1, 0);
-						Position = UDim2.new(1, -25, 0, 0);
-						Text = 'v';
-						TextColor3 = library.options.textcolor;
-						Font = library.options.font;
-						TextSize = library.options.fontsize;
-						TextStrokeTransparency = library.options.textstroke;
-						TextStrokeColor3 = library.options.strokecolor;
-					})
-				});
-				Parent = self.container;
-			});
-
-			local button = check:FindFirstChild('dropdown_lbl').drop;
-			local input;
-
-			button.MouseButton1Click:connect(function()
-				if (input and input.Connected) then
-					return
-				end 
-
-				check:FindFirstChild('dropdown_lbl'):WaitForChild('Selection').TextColor3 = Color3.fromRGB(60, 60, 60);
-				check:FindFirstChild('dropdown_lbl'):WaitForChild('Selection').Text = name;
-				local c = 0;
-				for i, v in next, list do
-					c = c + 20;
-				end
-
-				local size = UDim2.new(1, 0, 0, c)
-
-				local clampedSize;
-				local scrollSize = 0;
-				if size.Y.Offset > 100 then
-					clampedSize = UDim2.new(1, 0, 0, 100)
-					scrollSize = 5;
-				end
-
-				local goSize = (clampedSize ~= nil and clampedSize) or size;    
-				local container = library:Create('ScrollingFrame', {
-					TopImage = 'rbxasset://textures/ui/Scroll/scroll-middle.png';
-					BottomImage = 'rbxasset://textures/ui/Scroll/scroll-middle.png';
-					Name = 'DropContainer';
-					Parent = check:FindFirstChild('dropdown_lbl');
-					Size = UDim2.new(1, 0, 0, 0);
-					BackgroundColor3 = library.options.bgcolor;
-					BorderColor3 = library.options.bordercolor;
-					Position = UDim2.new(0, 0, 1, 0);
-					ScrollBarThickness = scrollSize;
-					CanvasSize = UDim2.new(0, 0, 0, size.Y.Offset);
-					ZIndex = 5;
-					ClipsDescendants = true;
-					library:Create('UIListLayout', {
-						Name = 'List';
-						SortOrder = Enum.SortOrder.LayoutOrder
-					})
-				})
-
-				for i, v in next, list do
-					local btn = library:Create('TextButton', {
-						Size = UDim2.new(1, 0, 0, 20);
-						BackgroundColor3 = library.options.btncolor;
-						BorderColor3 = library.options.bordercolor;
-						Text = v;
-						Font = library.options.font;
-						TextSize = library.options.fontsize;
-						LayoutOrder = i;
-						Parent = container;
-						ZIndex = 5;
-						TextColor3 = library.options.textcolor;
-						TextStrokeTransparency = library.options.textstroke;
-						TextStrokeColor3 = library.options.strokecolor;
-					})
-
-					btn.MouseButton1Click:connect(function()
-						check:FindFirstChild('dropdown_lbl'):WaitForChild('Selection').TextColor3 = library.options.textcolor
-						check:FindFirstChild('dropdown_lbl'):WaitForChild('Selection').Text = btn.Text;
-
-						location[flag] = tostring(btn.Text);
-						callback(location[flag])
-
-						game:GetService('Debris'):AddItem(container, 0)
-						input:disconnect();
-					end)
-				end
-
-				container:TweenSize(goSize, 'Out', 'Quad', 0.15, true)
-
-				local function isInGui(frame)
-					local mloc = game:GetService('UserInputService'):GetMouseLocation();
-					local mouse = Vector2.new(mloc.X, mloc.Y - 36);
-
-					local x1, x2 = frame.AbsolutePosition.X, frame.AbsolutePosition.X + frame.AbsoluteSize.X;
-					local y1, y2 = frame.AbsolutePosition.Y, frame.AbsolutePosition.Y + frame.AbsoluteSize.Y;
-
-					return (mouse.X >= x1 and mouse.X <= x2) and (mouse.Y >= y1 and mouse.Y <= y2)
-				end
-
-				input = game:GetService('UserInputService').InputBegan:connect(function(a)
-					if a.UserInputType == Enum.UserInputType.MouseButton1 and (not isInGui(container)) then
-						check:FindFirstChild('dropdown_lbl'):WaitForChild('Selection').TextColor3 = library.options.textcolor
-						check:FindFirstChild('dropdown_lbl'):WaitForChild('Selection').Text       = location[flag];
-
-						container:TweenSize(UDim2.new(1, 0, 0, 0), 'In', 'Quad', 0.15, true)
-						wait(0.15)
-
-						game:GetService('Debris'):AddItem(container, 0)
-						input:disconnect();
-					end
-				end)
-			end)
-
-			self:Resize();
-			local function reload(self, array)
-				options = array;
-				location[flag] = array[1];
-				pcall(function()
-					input:disconnect()
-				end)
-				check:WaitForChild('dropdown_lbl').Selection.Text = location[flag]
-				check:FindFirstChild('dropdown_lbl'):WaitForChild('Selection').TextColor3 = library.options.textcolor
-				game:GetService('Debris'):AddItem(container, 0)
-			end
-
-			return {
-				Refresh = reload;
-			}
-		end
-	end
-
-	function library:Create(class, data)
-		local obj = Instance.new(class);
-		for i, v in next, data do
-			if i ~= 'Parent' then
-
-				if typeof(v) == "Instance" then
-					v.Parent = obj;
-				else
-					obj[i] = v
-				end
-			end
-		end
-
-		obj.Parent = data.Parent;
-		return obj
-	end
-
-	function library:CreateWindow(name, options)
-		if (not library.container) then
-			library.container = self:Create("ScreenGui", {
-				self:Create('Frame', {
-					Name = 'Container';
-					Size = UDim2.new(1, -30, 1, 0);
-					Position = UDim2.new(0, 20, 0, 20);
-					BackgroundTransparency = 1;
-					Active = false;
-				});
-				Parent = game:GetService("CoreGui");
-			}):FindFirstChild('Container');
-		end
-
-		if (not library.options) then
-			library.options = setmetatable(options or {}, {__index = defaults})
-		end
-
-		local window = types.window(name, library.options);
-		dragger.new(window.object);
-		return window
-	end
-
-	default = {
-		topcolor       = Color3.fromRGB(30, 30, 30);
-		titlecolor     = Color3.fromRGB(255, 255, 255);
-
-		underlinecolor = Color3.fromRGB(0, 255, 140);
-		bgcolor        = Color3.fromRGB(35, 35, 35);
-		boxcolor       = Color3.fromRGB(35, 35, 35);
-		btncolor       = Color3.fromRGB(25, 25, 25);
-		dropcolor      = Color3.fromRGB(25, 25, 25);
-		sectncolor     = Color3.fromRGB(25, 25, 25);
-		bordercolor    = Color3.fromRGB(60, 60, 60);
-
-		font           = Enum.Font.SourceSans;
-		titlefont      = Enum.Font.Code;
-
-		fontsize       = 17;
-		titlesize      = 18;
-
-		textstroke     = 1;
-		titlestroke    = 1;
-
-		strokecolor    = Color3.fromRGB(0, 0, 0);
-
-		textcolor      = Color3.fromRGB(255, 255, 255);
-		titletextcolor = Color3.fromRGB(255, 255, 255);
-
-		placeholdercolor = Color3.fromRGB(255, 255, 255);
-		titlestrokecolor = Color3.fromRGB(0, 0, 0);
-	}
-
-	library.options = setmetatable({}, {__index = default})
-
-	spawn(function()
-		while true do
-			for i=0, 1, 1 / 300 do              
-				for _, obj in next, library.rainbowtable do
-					obj.BackgroundColor3 = Color3.fromHSV(i, 1, 1);
-				end
-				wait()
-			end;
-		end
-	end)
-
-	local function isreallypressed(bind, inp)
-		local key = bind
-		if typeof(key) == "Instance" then
-			if key.UserInputType == Enum.UserInputType.Keyboard and inp.KeyCode == key.KeyCode then
-				return true;
-			elseif tostring(key.UserInputType):find('MouseButton') and inp.UserInputType == key.UserInputType then
-				return true
-			end
-		end
-		if tostring(key):find'MouseButton1' then
-			return key == inp.UserInputType
-		else
-			return key == inp.KeyCode
-		end
-	end
-
-	game:GetService("UserInputService").InputBegan:connect(function(input)
-		if (not library.binding) then
-			for idx, binds in next, library.binds do
-				local real_binding = binds.location[idx];
-				if real_binding and isreallypressed(real_binding, input) then
-					binds.callback()
-				end
-			end
-		end
-	end)
+    local dragger = {}; do
+        local mouse        = game:GetService("Players").LocalPlayer:GetMouse();
+        local inputService = game:GetService('UserInputService');
+        local heartbeat    = game:GetService("RunService").Heartbeat;
+        -- // credits to Ririchi / Inori for this cute drag function :)
+        function dragger.new(frame)
+            local s, event = pcall(function()
+                return frame.MouseEnter
+            end)
+    
+            if s then
+                frame.Active = true;
+                
+                event:connect(function()
+                    local input = frame.InputBegan:connect(function(key)
+                        if key.UserInputType == Enum.UserInputType.MouseButton1 then
+                            local objectPosition = Vector2.new(mouse.X - frame.AbsolutePosition.X, mouse.Y - frame.AbsolutePosition.Y);
+                            while heartbeat:wait() and inputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) do
+                                pcall(function()
+                                    frame:TweenPosition(UDim2.new(0, mouse.X - objectPosition.X + (frame.Size.X.Offset * frame.AnchorPoint.X), 0, mouse.Y - objectPosition.Y + (frame.Size.Y.Offset * frame.AnchorPoint.Y)), 'Out', 'Linear', 0.1, true);
+                                end)
+                            end
+                        end
+                    end)
+    
+                    local leave;
+                    leave = frame.MouseLeave:connect(function()
+                        input:disconnect();
+                        leave:disconnect();
+                    end)
+                end)
+            end
+        end
+
+        game:GetService('UserInputService').InputBegan:connect(function(key, gpe)
+            if (not gpe) then
+                if key.KeyCode == Enum.KeyCode.RightControl then
+                    library.toggled = not library.toggled;
+                    for i, data in next, library.queue do
+                        local pos = (library.toggled and data.p or UDim2.new(-1, 0, -0.5,0))
+                        data.w:TweenPosition(pos, (library.toggled and 'Out' or 'In'), 'Quad', 0.15, true)
+                        wait();
+                    end
+                end
+            end
+        end)
+    end
+    
+    local types = {}; do
+        types.__index = types;
+        function types.window(name, options)
+            library.count = library.count + 1
+            local newWindow = library:Create('Frame', {
+                Name = name;
+                Size = UDim2.new(0, 190, 0, 30);
+                BackgroundColor3 = options.topcolor;
+                BorderSizePixel = 0;
+                Parent = library.container;
+                Position = UDim2.new(0, (15 + (200 * library.count) - 200), 0, 0);
+                ZIndex = 3;
+                library:Create('TextLabel', {
+                    Text = name;
+                    Size = UDim2.new(1, -10, 1, 0);
+                    Position = UDim2.new(0, 5, 0, 0);
+                    BackgroundTransparency = 1;
+                    Font = Enum.Font.Code;
+                    TextSize = options.titlesize;
+                    Font = options.titlefont;
+                    TextColor3 = options.titletextcolor;
+                    TextStrokeTransparency = library.options.titlestroke;
+                    TextStrokeColor3 = library.options.titlestrokecolor;
+                    ZIndex = 3;
+                });
+                library:Create("TextButton", {
+                    Size = UDim2.new(0, 30, 0, 30);
+                    Position = UDim2.new(1, -35, 0, 0);
+                    BackgroundTransparency = 1;
+                    Text = "-";
+                    TextSize = options.titlesize;
+                    Font = options.titlefont;--Enum.Font.Code;
+                    Name = 'window_toggle';
+                    TextColor3 = options.titletextcolor;
+                    TextStrokeTransparency = library.options.titlestroke;
+                    TextStrokeColor3 = library.options.titlestrokecolor;
+                    ZIndex = 3;
+                });
+                library:Create("Frame", {
+                    Name = 'Underline';
+                    Size = UDim2.new(1, 0, 0, 2);
+                    Position = UDim2.new(0, 0, 1, -2);
+                    BackgroundColor3 = (options.underlinecolor ~= "rainbow" and options.underlinecolor or Color3.new());
+                    BorderSizePixel = 0;
+                    ZIndex = 3;
+                });
+                library:Create('Frame', {
+                    Name = 'container';
+                    Position = UDim2.new(0, 0, 1, 0);
+                    Size = UDim2.new(1, 0, 0, 0);
+                    BorderSizePixel = 0;
+                    BackgroundColor3 = options.bgcolor;
+                    ClipsDescendants = false;
+                    library:Create('UIListLayout', {
+                        Name = 'List';
+                        SortOrder = Enum.SortOrder.LayoutOrder;
+                    })
+                });
+            })
+            
+            if options.underlinecolor == "rainbow" then
+                table.insert(library.rainbowtable, newWindow:FindFirstChild('Underline'))
+            end
+
+            local window = setmetatable({
+                count = 0;
+                object = newWindow;
+                container = newWindow.container;
+                toggled = true;
+                flags   = {};
+
+            }, types)
+
+            table.insert(library.queue, {
+                w = window.object;
+                p = window.object.Position;
+            })
+
+            newWindow:FindFirstChild("window_toggle").MouseButton1Click:connect(function()
+                window.toggled = not window.toggled;
+                newWindow:FindFirstChild("window_toggle").Text = (window.toggled and "+" or "-")
+                if (not window.toggled) then
+                    window.container.ClipsDescendants = true;
+                end
+                wait();
+                local y = 0;
+                for i, v in next, window.container:GetChildren() do
+                    if (not v:IsA('UIListLayout')) then
+                        y = y + v.AbsoluteSize.Y;
+                    end
+                end 
+
+                local targetSize = window.toggled and UDim2.new(1, 0, 0, y+5) or UDim2.new(1, 0, 0, 0);
+                local targetDirection = window.toggled and "In" or "Out"
+
+                window.container:TweenSize(targetSize, targetDirection, "Quad", 0.15, true)
+                wait(.15)
+                if window.toggled then
+                    window.container.ClipsDescendants = false;
+                end
+            end)
+
+            return window;
+        end
+        
+        function types:Resize()
+            local y = 0;
+            for i, v in next, self.container:GetChildren() do
+                if (not v:IsA('UIListLayout')) then
+                    y = y + v.AbsoluteSize.Y;
+                end
+            end 
+            self.container.Size = UDim2.new(1, 0, 0, y+5)
+        end
+        
+        function types:GetOrder() 
+            local c = 0;
+            for i, v in next, self.container:GetChildren() do
+                if (not v:IsA('UIListLayout')) then
+                    c = c + 1
+                end
+            end
+            return c
+        end
+        
+        function types:Label(text)
+            local v = game:GetService'TextService':GetTextSize(text, 18, Enum.Font.SourceSans, Vector2.new(math.huge, math.huge))
+            local object = library:Create('Frame', {
+                Size = UDim2.new(1, 0, 0, v.Y + 5);
+                BackgroundTransparency  = 1;
+                library:Create('TextLabel', {
+                    Size = UDim2.new(1, 0, 1, 0);
+                    Position = UDim2.new(0, 10, 0, 0);
+                    LayoutOrder = self:GetOrder();
+
+                    Text = text;
+                    TextSize = 18;
+                    Font = Enum.Font.SourceSans;
+                    TextColor3 = Color3.fromRGB(255, 255, 255);
+                    BackgroundTransparency = 1;
+                    TextXAlignment = Enum.TextXAlignment.Left;
+                    TextWrapped = true;
+                });
+                Parent = self.container
+            })
+            self:Resize();
+        end
+
+        function types:Toggle(name, options, callback)
+            local default  = options.default or false;
+            local location = options.location or self.flags;
+            local flag     = options.flag or "";
+            local callback = callback or function() end;
+            
+            location[flag] = default;
+
+            local check = library:Create('Frame', {
+                BackgroundTransparency = 1;
+                Size = UDim2.new(1, 0, 0, 25);
+                LayoutOrder = self:GetOrder();
+                library:Create('TextLabel', {
+                    Name = name;
+                    Text = "\r" .. name;
+                    BackgroundTransparency = 1;
+                    TextColor3 = library.options.textcolor;
+                    Position = UDim2.new(0, 5, 0, 0);
+                    Size     = UDim2.new(1, -5, 1, 0);
+                    TextXAlignment = Enum.TextXAlignment.Left;
+                    Font = library.options.font;
+                    TextSize = library.options.fontsize;
+                    TextStrokeTransparency = library.options.textstroke;
+                    TextStrokeColor3 = library.options.strokecolor;
+                    library:Create('TextButton', {
+                        Text = (location[flag] and utf8.char(10003) or "");
+                        Font = library.options.font;
+                        TextSize = library.options.fontsize;
+                        Name = 'Checkmark';
+                        Size = UDim2.new(0, 20, 0, 20);
+                        Position = UDim2.new(1, -25, 0, 4);
+                        TextColor3 = library.options.textcolor;
+                        BackgroundColor3 = library.options.bgcolor;
+                        BorderColor3 = library.options.bordercolor;
+                        TextStrokeTransparency = library.options.textstroke;
+                        TextStrokeColor3 = library.options.strokecolor;
+                    })
+                });
+                Parent = self.container;
+            });
+                
+            local function click(t)
+                location[flag] = not location[flag];
+                check:FindFirstChild(name).Checkmark.Text = location[flag] and utf8.char(10003) or "";
+                callback(location[flag])
+            end
+
+            check:FindFirstChild(name).Checkmark.MouseButton1Click:connect(click)
+            library.callbacks[flag] = click;
+
+            if location[flag] == true then
+                callback(location[flag])
+            end
+
+            self:Resize();
+            return {
+                Set = function(self, b)
+                    location[flag] = b;
+                    callback(location[flag])
+                    check:FindFirstChild(name).Checkmark.Text = location[flag] and utf8.char(10003) or "";
+                end
+            }
+        end
+        
+        function types:Button(name, callback)
+            callback = callback or function() end;
+            
+            local check = library:Create('Frame', {
+                BackgroundTransparency = 1;
+                Size = UDim2.new(1, 0, 0, 25);
+                LayoutOrder = self:GetOrder();
+                library:Create('TextButton', {
+                    Name = name;
+                    Text = name;
+                    BackgroundColor3 = library.options.btncolor;
+                    BorderColor3 = library.options.bordercolor;
+                    TextStrokeTransparency = library.options.textstroke;
+                    TextStrokeColor3 = library.options.strokecolor;
+                    TextColor3 = library.options.textcolor;
+                    Position = UDim2.new(0, 5, 0, 5);
+                    Size     = UDim2.new(1, -10, 0, 20);
+                    Font = library.options.font;
+                    TextSize = library.options.fontsize;
+                });
+                Parent = self.container;
+            });
+            
+            check:FindFirstChild(name).MouseButton1Click:connect(callback)
+            self:Resize();
+
+            return {
+                Fire = function()
+                    callback();
+                end
+            }
+        end
+        
+        function types:Box(name, options, callback) --type, default, data, location, flag)
+            local type   = options.type or "";
+            local default = options.default or "";
+            local data = options.data
+            local location = options.location or self.flags;
+            local flag     = options.flag or "";
+            local callback = callback or function() end;
+            local min      = options.min or 0;
+            local max      = options.max or 9e9;
+
+            if type == 'number' and (not tonumber(default)) then
+                location[flag] = default;
+            else
+                location[flag] = "";
+                default = "";
+            end
+
+            local check = library:Create('Frame', {
+                BackgroundTransparency = 1;
+                Size = UDim2.new(1, 0, 0, 25);
+                LayoutOrder = self:GetOrder();
+                library:Create('TextLabel', {
+                    Name = name;
+                    Text = "\r" .. name;
+                    BackgroundTransparency = 1;
+                    TextColor3 = library.options.textcolor;
+                    TextStrokeTransparency = library.options.textstroke;
+                    TextStrokeColor3 = library.options.strokecolor;
+                    Position = UDim2.new(0, 5, 0, 0);
+                    Size     = UDim2.new(1, -5, 1, 0);
+                    TextXAlignment = Enum.TextXAlignment.Left;
+                    Font = library.options.font;
+                    TextSize = library.options.fontsize;
+                    library:Create('TextBox', {
+                        TextStrokeTransparency = library.options.textstroke;
+                        TextStrokeColor3 = library.options.strokecolor;
+                        Text = tostring(default);
+                        Font = library.options.font;
+                        TextSize = library.options.fontsize;
+                        Name = 'Box';
+                        Size = UDim2.new(0, 60, 0, 20);
+                        Position = UDim2.new(1, -65, 0, 3);
+                        TextColor3 = library.options.textcolor;
+                        BackgroundColor3 = library.options.boxcolor;
+                        BorderColor3 = library.options.bordercolor;
+                        PlaceholderColor3 = library.options.placeholdercolor;
+                    })
+                });
+                Parent = self.container;
+            });
+        
+            local box = check:FindFirstChild(name):FindFirstChild('Box');
+            box.FocusLost:connect(function(e)
+                local old = location[flag];
+                if type == "number" then
+                    local num = tonumber(box.Text)
+                    if (not num) then
+                        box.Text = tonumber(location[flag])
+                    else
+                        location[flag] = math.clamp(num, min, max)
+                        box.Text = tonumber(location[flag])
+                    end
+                else
+                    location[flag] = tostring(box.Text)
+                end
+
+                callback(location[flag], old, e)
+            end)
+            
+            if type == 'number' then
+                box:GetPropertyChangedSignal('Text'):connect(function()
+                    box.Text = string.gsub(box.Text, "[%a+]", "");
+                end)
+            end
+            
+            self:Resize();
+            return box
+        end
+        
+        function types:Bind(name, options, callback)
+            local location     = options.location or self.flags;
+            local keyboardOnly = options.kbonly or false
+            local flag         = options.flag or "";
+            local callback     = callback or function() end;
+            local default      = options.default;
+
+            if keyboardOnly and (not tostring(default):find('MouseButton')) then
+                location[flag] = default
+            end
+            
+            local banned = {
+                Return = true;
+                Space = true;
+                Tab = true;
+                Unknown = true;
+            }
+            
+            local shortNames = {
+                RightControl = 'RightCtrl';
+                LeftControl = 'LeftCtrl';
+                LeftShift = 'LShift';
+                RightShift = 'RShift';
+                MouseButton1 = "Mouse1";
+                MouseButton2 = "Mouse2";
+            }
+            
+            local allowed = {
+                MouseButton1 = true;
+                MouseButton2 = true;
+            }      
+
+            local nm = (default and (shortNames[default.Name] or default.Name) or "None");
+            local check = library:Create('Frame', {
+                BackgroundTransparency = 1;
+                Size = UDim2.new(1, 0, 0, 30);
+                LayoutOrder = self:GetOrder();
+                library:Create('TextLabel', {
+                    Name = name;
+                    Text = "\r" .. name;
+                    BackgroundTransparency = 1;
+                    TextColor3 = library.options.textcolor;
+                    Position = UDim2.new(0, 5, 0, 0);
+                    Size     = UDim2.new(1, -5, 1, 0);
+                    TextXAlignment = Enum.TextXAlignment.Left;
+                    Font = library.options.font;
+                    TextSize = library.options.fontsize;
+                    TextStrokeTransparency = library.options.textstroke;
+                    TextStrokeColor3 = library.options.strokecolor;
+                    BorderColor3     = library.options.bordercolor;
+                    BorderSizePixel  = 1;
+                    library:Create('TextButton', {
+                        Name = 'Keybind';
+                        Text = nm;
+                        TextStrokeTransparency = library.options.textstroke;
+                        TextStrokeColor3 = library.options.strokecolor;
+                        Font = library.options.font;
+                        TextSize = library.options.fontsize;
+                        Size = UDim2.new(0, 60, 0, 20);
+                        Position = UDim2.new(1, -65, 0, 5);
+                        TextColor3 = library.options.textcolor;
+                        BackgroundColor3 = library.options.bgcolor;
+                        BorderColor3     = library.options.bordercolor;
+                        BorderSizePixel  = 1;
+                    })
+                });
+                Parent = self.container;
+            });
+             
+            local button = check:FindFirstChild(name).Keybind;
+            button.MouseButton1Click:connect(function()
+                library.binding = true
+
+                button.Text = "..."
+                local a, b = game:GetService('UserInputService').InputBegan:wait();
+                local name = tostring(a.KeyCode.Name);
+                local typeName = tostring(a.UserInputType.Name);
+
+                if (a.UserInputType ~= Enum.UserInputType.Keyboard and (allowed[a.UserInputType.Name]) and (not keyboardOnly)) or (a.KeyCode and (not banned[a.KeyCode.Name])) then
+                    local name = (a.UserInputType ~= Enum.UserInputType.Keyboard and a.UserInputType.Name or a.KeyCode.Name);
+                    location[flag] = (a);
+                    button.Text = shortNames[name] or name;
+                    
+                else
+                    if (location[flag]) then
+                        if (not pcall(function()
+                            return location[flag].UserInputType
+                        end)) then
+                            local name = tostring(location[flag])
+                            button.Text = shortNames[name] or name
+                        else
+                            local name = (location[flag].UserInputType ~= Enum.UserInputType.Keyboard and location[flag].UserInputType.Name or location[flag].KeyCode.Name);
+                            button.Text = shortNames[name] or name;
+                        end
+                    end
+                end
+
+                wait(0.1)  
+                library.binding = false;
+            end)
+            
+            if location[flag] then
+                button.Text = shortNames[tostring(location[flag].Name)] or tostring(location[flag].Name)
+            end
+
+            library.binds[flag] = {
+                location = location;
+                callback = callback;
+            };
+
+            self:Resize();
+        end
+    
+        function types:Section(name)
+            local order = self:GetOrder();
+            local determinedSize = UDim2.new(1, 0, 0, 25)
+            local determinedPos = UDim2.new(0, 0, 0, 4);
+            local secondarySize = UDim2.new(1, 0, 0, 20);
+                        
+            if order == 0 then
+                determinedSize = UDim2.new(1, 0, 0, 21)
+                determinedPos = UDim2.new(0, 0, 0, -1);
+                secondarySize = nil
+            end
+            
+            local check = library:Create('Frame', {
+                Name = 'Section';
+                BackgroundTransparency = 1;
+                Size = determinedSize;
+                BackgroundColor3 = library.options.sectncolor;
+                BorderSizePixel = 0;
+                LayoutOrder = order;
+                library:Create('TextLabel', {
+                    Name = 'section_lbl';
+                    Text = name;
+                    BackgroundTransparency = 0;
+                    BorderSizePixel = 0;
+                    BackgroundColor3 = library.options.sectncolor;
+                    TextColor3 = library.options.textcolor;
+                    Position = determinedPos;
+                    Size     = (secondarySize or UDim2.new(1, 0, 1, 0));
+                    Font = library.options.font;
+                    TextSize = library.options.fontsize;
+                    TextStrokeTransparency = library.options.textstroke;
+                    TextStrokeColor3 = library.options.strokecolor;
+                });
+                Parent = self.container;
+            });
+        
+            self:Resize();
+        end
+
+        function types:Slider(name, options, callback)
+            local default = options.default or options.min;
+            local min     = options.min or 0;
+            local max      = options.max or 1;
+            local location = options.location or self.flags;
+            local precise  = options.precise  or false -- e.g 0, 1 vs 0, 0.1, 0.2, ...
+            local flag     = options.flag or "";
+            local callback = callback or function() end
+
+            location[flag] = default;
+
+            local check = library:Create('Frame', {
+                BackgroundTransparency = 1;
+                Size = UDim2.new(1, 0, 0, 25);
+                LayoutOrder = self:GetOrder();
+                library:Create('TextLabel', {
+                    Name = name;
+                    TextStrokeTransparency = library.options.textstroke;
+                    TextStrokeColor3 = library.options.strokecolor;
+                    Text = "\r" .. name;
+                    BackgroundTransparency = 1;
+                    TextColor3 = library.options.textcolor;
+                    Position = UDim2.new(0, 5, 0, 2);
+                    Size     = UDim2.new(1, -5, 1, 0);
+                    TextXAlignment = Enum.TextXAlignment.Left;
+                    Font = library.options.font;
+                    TextSize = library.options.fontsize;
+                    library:Create('Frame', {
+                        Name = 'Container';
+                        Size = UDim2.new(0, 60, 0, 20);
+                        Position = UDim2.new(1, -65, 0, 3);
+                        BackgroundTransparency = 1;
+                        --BorderColor3 = library.options.bordercolor;
+                        BorderSizePixel = 0;
+                        library:Create('TextLabel', {
+                            Name = 'ValueLabel';
+                            Text = default;
+                            BackgroundTransparency = 1;
+                            TextColor3 = library.options.textcolor;
+                            Position = UDim2.new(0, -10, 0, 0);
+                            Size     = UDim2.new(0, 1, 1, 0);
+                            TextXAlignment = Enum.TextXAlignment.Right;
+                            Font = library.options.font;
+                            TextSize = library.options.fontsize;
+                            TextStrokeTransparency = library.options.textstroke;
+                            TextStrokeColor3 = library.options.strokecolor;
+                        });
+                        library:Create('TextButton', {
+                            Name = 'Button';
+                            Size = UDim2.new(0, 5, 1, -2);
+                            Position = UDim2.new(0, 0, 0, 1);
+                            AutoButtonColor = false;
+                            Text = "";
+                            BackgroundColor3 = Color3.fromRGB(20, 20, 20);
+                            BorderSizePixel = 0;
+                            ZIndex = 2;
+                            TextStrokeTransparency = library.options.textstroke;
+                            TextStrokeColor3 = library.options.strokecolor;
+                        });
+                        library:Create('Frame', {
+                            Name = 'Line';
+                            BackgroundTransparency = 0;
+                            Position = UDim2.new(0, 0, 0.5, 0);
+                            Size     = UDim2.new(1, 0, 0, 1);
+                            BackgroundColor3 = Color3.fromRGB(255, 255, 255);
+                            BorderSizePixel = 0;
+                        });
+                    })
+                });
+                Parent = self.container;
+            });
+
+            local overlay = check:FindFirstChild(name);
+
+            local renderSteppedConnection;
+            local inputBeganConnection;
+            local inputEndedConnection;
+            local mouseLeaveConnection;
+            local mouseDownConnection;
+            local mouseUpConnection;
+
+            check:FindFirstChild(name).Container.MouseEnter:connect(function()
+                local function update()
+                    if renderSteppedConnection then renderSteppedConnection:disconnect() end 
+                    
+
+                    renderSteppedConnection = game:GetService('RunService').RenderStepped:connect(function()
+                        local mouse = game:GetService("UserInputService"):GetMouseLocation()
+                        local percent = (mouse.X - overlay.Container.AbsolutePosition.X) / (overlay.Container.AbsoluteSize.X)
+                        percent = math.clamp(percent, 0, 1)
+                        percent = tonumber(string.format("%.2f", percent))
+
+                        overlay.Container.Button.Position = UDim2.new(math.clamp(percent, 0, 0.99), 0, 0, 1)
+                        
+                        local num = min + (max - min) * percent
+                        local value = (precise and num or math.floor(num))
+
+                        overlay.Container.ValueLabel.Text = value;
+                        callback(tonumber(value))
+                        location[flag] = tonumber(value)
+                    end)
+                end
+
+                local function disconnect()
+                    if renderSteppedConnection then renderSteppedConnection:disconnect() end
+                    if inputBeganConnection then inputBeganConnection:disconnect() end
+                    if inputEndedConnection then inputEndedConnection:disconnect() end
+                    if mouseLeaveConnection then mouseLeaveConnection:disconnect() end
+                    if mouseUpConnection then mouseUpConnection:disconnect() end
+                end
+
+                inputBeganConnection = check:FindFirstChild(name).Container.InputBegan:connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                        update()
+                    end
+                end)
+
+                inputEndedConnection = check:FindFirstChild(name).Container.InputEnded:connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                        disconnect()
+                    end
+                end)
+
+                mouseDownConnection = check:FindFirstChild(name).Container.Button.MouseButton1Down:connect(update)
+                mouseUpConnection   = game:GetService("UserInputService").InputEnded:connect(function(a, b)
+                    if a.UserInputType == Enum.UserInputType.MouseButton1 and (mouseDownConnection.Connected) then
+                        disconnect()
+                    end
+                end)
+            end)    
+
+            if default ~= min then
+                local percent = 1 - ((max - default) / (max - min))
+                local number  = default 
+
+                number = tonumber(string.format("%.2f", number))
+                if (not precise) then
+                    number = math.floor(number)
+                end
+
+                overlay.Container.Button.Position  = UDim2.new(math.clamp(percent, 0, 0.99), 0,  0, 1) 
+                overlay.Container.ValueLabel.Text  = number
+            end
+
+            self:Resize();
+            return {
+                Set = function(self, value)
+                    local percent = 1 - ((max - value) / (max - min))
+                    local number  = value 
+
+                    number = tonumber(string.format("%.2f", number))
+                    if (not precise) then
+                        number = math.floor(number)
+                    end
+
+                    overlay.Container.Button.Position  = UDim2.new(math.clamp(percent, 0, 0.99), 0,  0, 1) 
+                    overlay.Container.ValueLabel.Text  = number
+                    location[flag] = number
+                    callback(number)
+                end
+            }
+        end 
+
+        function types:SearchBox(text, options, callback)
+            local list = options.list or {};
+            local flag = options.flag or "";
+            local location = options.location or self.flags;
+            local callback = callback or function() end;
+
+            local busy = false;
+            local box = library:Create('Frame', {
+                BackgroundTransparency = 1;
+                Size = UDim2.new(1, 0, 0, 25);
+                LayoutOrder = self:GetOrder();
+                library:Create('TextBox', {
+                    Text = "";
+                    PlaceholderText = text;
+                    PlaceholderColor3 = Color3.fromRGB(60, 60, 60);
+                    Font = library.options.font;
+                    TextSize = library.options.fontsize;
+                    Name = 'Box';
+                    Size = UDim2.new(1, -10, 0, 20);
+                    Position = UDim2.new(0, 5, 0, 4);
+                    TextColor3 = library.options.textcolor;
+                    BackgroundColor3 = library.options.dropcolor;
+                    BorderColor3 = library.options.bordercolor;
+                    TextStrokeTransparency = library.options.textstroke;
+                    TextStrokeColor3 = library.options.strokecolor;
+                    library:Create('ScrollingFrame', {
+                        Position = UDim2.new(0, 0, 1, 1);
+                        Name = 'Container';
+                        BackgroundColor3 = library.options.btncolor;
+                        ScrollBarThickness = 0;
+                        BorderSizePixel = 0;
+                        BorderColor3 = library.options.bordercolor;
+                        Size = UDim2.new(1, 0, 0, 0);
+                        library:Create('UIListLayout', {
+                            Name = 'ListLayout';
+                            SortOrder = Enum.SortOrder.LayoutOrder;
+                        });
+                        ZIndex = 2;
+                    });
+                });
+                Parent = self.container;
+            })
+
+            local function rebuild(text)
+                box:FindFirstChild('Box').Container.ScrollBarThickness = 0
+                for i, child in next, box:FindFirstChild('Box').Container:GetChildren() do
+                    if (not child:IsA('UIListLayout')) then
+                        child:Destroy();
+                    end
+                end
+
+                if #text > 0 then
+                    for i, v in next, list do
+                        if string.sub(string.lower(v), 1, string.len(text)) == string.lower(text) then
+                            local button = library:Create('TextButton', {
+                                Text = v;
+                                Font = library.options.font;
+                                TextSize = library.options.fontsize;
+                                TextColor3 = library.options.textcolor;
+                                BorderColor3 = library.options.bordercolor;
+                                TextStrokeTransparency = library.options.textstroke;
+                                TextStrokeColor3 = library.options.strokecolor;
+                                Parent = box:FindFirstChild('Box').Container;
+                                Size = UDim2.new(1, 0, 0, 20);
+                                LayoutOrder = i;
+                                BackgroundColor3 = library.options.btncolor;
+                                ZIndex = 2;
+                            })
+
+                            button.MouseButton1Click:connect(function()
+                                busy = true;
+                                box:FindFirstChild('Box').Text = button.Text;
+                                wait();
+                                busy = false;
+
+                                location[flag] = button.Text;
+                                callback(location[flag])
+
+                                box:FindFirstChild('Box').Container.ScrollBarThickness = 0
+                                for i, child in next, box:FindFirstChild('Box').Container:GetChildren() do
+                                    if (not child:IsA('UIListLayout')) then
+                                        child:Destroy();
+                                    end
+                                end
+                                box:FindFirstChild('Box').Container:TweenSize(UDim2.new(1, 0, 0, 0), 'Out', 'Quad', 0.25, true)
+                            end)
+                        end
+                    end
+                end
+
+                local c = box:FindFirstChild('Box').Container:GetChildren()
+                local ry = (20 * (#c)) - 20
+
+                local y = math.clamp((20 * (#c)) - 20, 0, 100)
+                if ry > 100 then
+                    box:FindFirstChild('Box').Container.ScrollBarThickness = 5;
+                end
+
+                box:FindFirstChild('Box').Container:TweenSize(UDim2.new(1, 0, 0, y), 'Out', 'Quad', 0.25, true)
+                box:FindFirstChild('Box').Container.CanvasSize = UDim2.new(1, 0, 0, (20 * (#c)) - 20)
+            end
+
+            box:FindFirstChild('Box'):GetPropertyChangedSignal('Text'):connect(function()
+                if (not busy) then
+                    rebuild(box:FindFirstChild('Box').Text)
+                end
+            end);
+
+            local function reload(new_list)
+                list = new_list;
+                rebuild("")
+            end
+            self:Resize();
+            return reload, box:FindFirstChild('Box');
+        end
+        
+        function types:Dropdown(name, options, callback)
+            local location = options.location or self.flags;
+            local flag = options.flag or "";
+            local callback = callback or function() end;
+            local list = options.list or {};
+
+            location[flag] = list[1]
+            local check = library:Create('Frame', {
+                BackgroundTransparency = 1;
+                Size = UDim2.new(1, 0, 0, 25);
+                BackgroundColor3 = Color3.fromRGB(25, 25, 25);
+                BorderSizePixel = 0;
+                LayoutOrder = self:GetOrder();
+                library:Create('Frame', {
+                    Name = 'dropdown_lbl';
+                    BackgroundTransparency = 0;
+                    BackgroundColor3 = library.options.dropcolor;
+                    Position = UDim2.new(0, 5, 0, 4);
+                    BorderColor3 = library.options.bordercolor;
+                    Size     = UDim2.new(1, -10, 0, 20);
+                    library:Create('TextLabel', {
+                        Name = 'Selection';
+                        Size = UDim2.new(1, 0, 1, 0);
+                        Text = list[1];
+                        TextColor3 = library.options.textcolor;
+                        BackgroundTransparency = 1;
+                        Font = library.options.font;
+                        TextSize = library.options.fontsize;
+                        TextStrokeTransparency = library.options.textstroke;
+                        TextStrokeColor3 = library.options.strokecolor;
+                    });
+                    library:Create("TextButton", {
+                        Name = 'drop';
+                        BackgroundTransparency = 1;
+                        Size = UDim2.new(0, 20, 1, 0);
+                        Position = UDim2.new(1, -25, 0, 0);
+                        Text = 'v';
+                        TextColor3 = library.options.textcolor;
+                        Font = library.options.font;
+                        TextSize = library.options.fontsize;
+                        TextStrokeTransparency = library.options.textstroke;
+                        TextStrokeColor3 = library.options.strokecolor;
+                    })
+                });
+                Parent = self.container;
+            });
+            
+            local button = check:FindFirstChild('dropdown_lbl').drop;
+            local input;
+            
+            button.MouseButton1Click:connect(function()
+                if (input and input.Connected) then
+                    return
+                end 
+                
+                check:FindFirstChild('dropdown_lbl'):WaitForChild('Selection').TextColor3 = Color3.fromRGB(60, 60, 60);
+                check:FindFirstChild('dropdown_lbl'):WaitForChild('Selection').Text = name;
+                local c = 0;
+                for i, v in next, list do
+                    c = c + 20;
+                end
+
+                local size = UDim2.new(1, 0, 0, c)
+
+                local clampedSize;
+                local scrollSize = 0;
+                if size.Y.Offset > 100 then
+                    clampedSize = UDim2.new(1, 0, 0, 100)
+                    scrollSize = 5;
+                end
+                
+                local goSize = (clampedSize ~= nil and clampedSize) or size;    
+                local container = library:Create('ScrollingFrame', {
+                    TopImage = 'rbxasset://textures/ui/Scroll/scroll-middle.png';
+                    BottomImage = 'rbxasset://textures/ui/Scroll/scroll-middle.png';
+                    Name = 'DropContainer';
+                    Parent = check:FindFirstChild('dropdown_lbl');
+                    Size = UDim2.new(1, 0, 0, 0);
+                    BackgroundColor3 = library.options.bgcolor;
+                    BorderColor3 = library.options.bordercolor;
+                    Position = UDim2.new(0, 0, 1, 0);
+                    ScrollBarThickness = scrollSize;
+                    CanvasSize = UDim2.new(0, 0, 0, size.Y.Offset);
+                    ZIndex = 5;
+                    ClipsDescendants = true;
+                    library:Create('UIListLayout', {
+                        Name = 'List';
+                        SortOrder = Enum.SortOrder.LayoutOrder
+                    })
+                })
+
+                for i, v in next, list do
+                    local btn = library:Create('TextButton', {
+                        Size = UDim2.new(1, 0, 0, 20);
+                        BackgroundColor3 = library.options.btncolor;
+                        BorderColor3 = library.options.bordercolor;
+                        Text = v;
+                        Font = library.options.font;
+                        TextSize = library.options.fontsize;
+                        LayoutOrder = i;
+                        Parent = container;
+                        ZIndex = 5;
+                        TextColor3 = library.options.textcolor;
+                        TextStrokeTransparency = library.options.textstroke;
+                        TextStrokeColor3 = library.options.strokecolor;
+                    })
+                    
+                    btn.MouseButton1Click:connect(function()
+                        check:FindFirstChild('dropdown_lbl'):WaitForChild('Selection').TextColor3 = library.options.textcolor
+                        check:FindFirstChild('dropdown_lbl'):WaitForChild('Selection').Text = btn.Text;
+
+                        location[flag] = tostring(btn.Text);
+                        callback(location[flag])
+
+                        game:GetService('Debris'):AddItem(container, 0)
+                        input:disconnect();
+                    end)
+                end
+                
+                container:TweenSize(goSize, 'Out', 'Quad', 0.15, true)
+                
+                local function isInGui(frame)
+                    local mloc = game:GetService('UserInputService'):GetMouseLocation();
+                    local mouse = Vector2.new(mloc.X, mloc.Y - 36);
+                    
+                    local x1, x2 = frame.AbsolutePosition.X, frame.AbsolutePosition.X + frame.AbsoluteSize.X;
+                    local y1, y2 = frame.AbsolutePosition.Y, frame.AbsolutePosition.Y + frame.AbsoluteSize.Y;
+                
+                    return (mouse.X >= x1 and mouse.X <= x2) and (mouse.Y >= y1 and mouse.Y <= y2)
+                end
+                
+                input = game:GetService('UserInputService').InputBegan:connect(function(a)
+                    if a.UserInputType == Enum.UserInputType.MouseButton1 and (not isInGui(container)) then
+                        check:FindFirstChild('dropdown_lbl'):WaitForChild('Selection').TextColor3 = library.options.textcolor
+                        check:FindFirstChild('dropdown_lbl'):WaitForChild('Selection').Text       = location[flag];
+
+                        container:TweenSize(UDim2.new(1, 0, 0, 0), 'In', 'Quad', 0.15, true)
+                        wait(0.15)
+
+                        game:GetService('Debris'):AddItem(container, 0)
+                        input:disconnect();
+                    end
+                end)
+            end)
+            
+            self:Resize();
+            local function reload(self, array)
+                options = array;
+                location[flag] = array[1];
+                pcall(function()
+                    input:disconnect()
+                end)
+                check:WaitForChild('dropdown_lbl').Selection.Text = location[flag]
+                check:FindFirstChild('dropdown_lbl'):WaitForChild('Selection').TextColor3 = library.options.textcolor
+                game:GetService('Debris'):AddItem(container, 0)
+            end
+
+            return {
+                Refresh = reload;
+            }
+        end
+    end
+    
+    function library:Create(class, data)
+        local obj = Instance.new(class);
+        for i, v in next, data do
+            if i ~= 'Parent' then
+                
+                if typeof(v) == "Instance" then
+                    v.Parent = obj;
+                else
+                    obj[i] = v
+                end
+            end
+        end
+        
+        obj.Parent = data.Parent;
+        return obj
+    end
+    
+    function library:CreateWindow(name, options)
+        if (not library.container) then
+            library.container = self:Create("ScreenGui", {
+                self:Create('Frame', {
+                    Name = 'Container';
+                    Size = UDim2.new(1, -30, 1, 0);
+                    Position = UDim2.new(0, 20, 0, 20);
+                    BackgroundTransparency = 1;
+                    Active = false;
+                });
+                Parent = game:GetService("CoreGui");
+            }):FindFirstChild('Container');
+        end
+        
+        if (not library.options) then
+            library.options = setmetatable(options or {}, {__index = defaults})
+        end
+        
+        local window = types.window(name, library.options);
+        dragger.new(window.object);
+        return window
+    end
+    
+    default = {
+        topcolor       = Color3.fromRGB(30, 30, 30);
+        titlecolor     = Color3.fromRGB(255, 255, 255);
+        
+        underlinecolor = Color3.fromRGB(0, 255, 140);
+        bgcolor        = Color3.fromRGB(35, 35, 35);
+        boxcolor       = Color3.fromRGB(35, 35, 35);
+        btncolor       = Color3.fromRGB(25, 25, 25);
+        dropcolor      = Color3.fromRGB(25, 25, 25);
+        sectncolor     = Color3.fromRGB(25, 25, 25);
+        bordercolor    = Color3.fromRGB(60, 60, 60);
+
+        font           = Enum.Font.SourceSans;
+        titlefont      = Enum.Font.Code;
+
+        fontsize       = 17;
+        titlesize      = 18;
+
+        textstroke     = 1;
+        titlestroke    = 1;
+
+        strokecolor    = Color3.fromRGB(0, 0, 0);
+
+        textcolor      = Color3.fromRGB(255, 255, 255);
+        titletextcolor = Color3.fromRGB(255, 255, 255);
+
+        placeholdercolor = Color3.fromRGB(255, 255, 255);
+        titlestrokecolor = Color3.fromRGB(0, 0, 0);
+    }
+
+    library.options = setmetatable({}, {__index = default})
+
+    spawn(function()
+        while true do
+            for i=0, 1, 1 / 300 do              
+                for _, obj in next, library.rainbowtable do
+                    obj.BackgroundColor3 = Color3.fromHSV(i, 1, 1);
+                end
+                wait()
+            end;
+        end
+    end)
+
+    local function isreallypressed(bind, inp)
+        local key = bind
+        if typeof(key) == "Instance" then
+            if key.UserInputType == Enum.UserInputType.Keyboard and inp.KeyCode == key.KeyCode then
+                return true;
+            elseif tostring(key.UserInputType):find('MouseButton') and inp.UserInputType == key.UserInputType then
+                return true
+            end
+        end
+        if tostring(key):find'MouseButton1' then
+            return key == inp.UserInputType
+        else
+            return key == inp.KeyCode
+        end
+    end
+
+    game:GetService("UserInputService").InputBegan:connect(function(input)
+        if (not library.binding) then
+            for idx, binds in next, library.binds do
+                local real_binding = binds.location[idx];
+                if real_binding and isreallypressed(real_binding, input) then
+                    binds.callback()
+                end
+            end
+        end
+    end)
 end
 
 
@@ -1109,7 +1109,6 @@ print("ANTI LEAK LOADED - Your execution has been reported! lets hope its not a 
 
 
 
-return library	
 
 
-ll_]]=#__[_[____]];_l=_l+_ll;_=__l[_l];__[_[___l]]=_[___]*__[_[____l]];_l=_l+_ll;_=__l[_l];__[_[__l_]]=__[_[_lll]]-_[_l_l_];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=_[_l_ll];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_[__lll];_l=_l+_ll;_=__l[_l];_l_=_[_l__]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[_llll]))_l=_l+_ll;_=__l[_l];if(_[_l__]<__[_[_lll_]])then _l=_l+___l_;else _l=_[___];end;break end while 272==(_l_)/((0xd5-164))do local _l__l;local _l_;__[_[_ll_]]=_ll_l[_[_l_ll]];_l=_l+_ll;_=__l[_l];_l_=_[___l];_l__l=__[_[_lll]];__[_l_+1]=_l__l;__[_l_]=_l__l[_[_l_l_]];_l=_l+_ll;_=__l[_l];__[_[__l_]]=__l_l[_[_l_ll]];_l=_l+_ll;_=__l[_l];__[_[__l_]]=_[_llll];_l=_l+_ll;_=__l[_l];__[_[_l__]]=_[_llll];_l=_l+_ll;_=__l[_l];__[_[___l]]=_[____];_l=_l+_ll;_=__l[_l];_l_=_[_ll_]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[____]))_l=_l+_ll;_=__l[_l];_l_=_[___l]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[__lll]))_l=_l+_ll;_=__l[_l];_l_=_[_ll_];_l__l=__[_[__lll]];__[_l_+1]=_l__l;__[_l_]=_l__l[_[_lll_]];_l=_l+_ll;_=__l[_l];__[_[___l]]=__l_l[_[_l_ll]];_l=_l+_ll;_=__l[_l];__[_[__l_]]=_[__lll];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_[___];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_[_llll];_l=_l+_ll;_=__l[_l];_l_=_[___l]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[___]))_l=_l+_ll;_=__l[_l];_l_=_[_l_l]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[___]))_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_ll_l[_[__lll]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=__[_[__lll]][_[__ll_]];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=__[_[_l_ll]][_[__ll_]];_l=_l+_ll;_=__l[_l];__[_[___l]][_[_llll]]=__[_[__l__]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_ll_l[_[_llll]];_l=_l+_ll;_=__l[_l];_l_=_[__ll];_l__l=__[_[_lll]];__[_l_+1]=_l__l;__[_l_]=_l__l[_[__ll_]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=__l_l[_[_llll]];_l=_l+_ll;_=__l[_l];__[_[_l__]]=_[____];_l=_l+_ll;_=__l[_l];__[_[___l]]=_[___];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=_[___];_l=_l+_ll;_=__l[_l];_l_=_[__l_]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[_llll]))_l=_l+_ll;_=__l[_l];_l_=_[___l]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[_llll]))_l=_l+_ll;_=__l[_l];_l_=_[_l_l];_l__l=__[_[____]];__[_l_+1]=_l__l;__[_l_]=_l__l[_[_l_l_]];_l=_l+_ll;_=__l[_l];__[_[___l]]=__l_l[_[____]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_[___];_l=_l+_ll;_=__l[_l];__[_[_l__]]=_[_l_ll];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_[__lll];_l=_l+_ll;_=__l[_l];_l_=_[_l_l]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[___]))_l=_l+_ll;_=__l[_l];_l_=_[_l__]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[_lll]))_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_ll_l[_[_lll]];_l=_l+_ll;_=__l[_l];__[_[___l]]=__[_[___]][_[_lll_]];_l=_l+_ll;_=__l[_l];__[_[__ll]][_[_l_ll]]=__[_[_ll__]];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_ll_l[_[___]];_l=_l+_ll;_=__l[_l];__[_[__l_]]=_ll_l[_[___]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=__l_l[_[____]];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_ll_l[_[__lll]];_l=_l+_ll;_=__l[_l];__[_[__l_]]=__[_[___]][_[_ll__]];_l=_l+_ll;_=__l[_l];_l_=_[_l__]__[_l_]=__[_l_](__[_l_+___l_])_l=_l+_ll;_=__l[_l];__[_[___l]][__[_[__lll]]]=__[_[____l]];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_ll_l[_[_l_ll]];_l=_l+_ll;_=__l[_l];__[_[__l_]]=_ll_l[_[_l_ll]];_l=_l+_ll;_=__l[_l];__[_[___l]]=_ll_l[_[____]];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=__[_[___]][__[_[__l__]]];_l=_l+_ll;_=__l[_l];_l_=_[_ll_]__[_l_](__[_l_+___l_])_l=_l+_ll;_=__l[_l];__[_[_ll_]]=__l_l[_[__lll]];_l=_l+_ll;_=__l[_l];_l_=_[_l__];_l__l=__[_[_l_ll]];__[_l_+1]=_l__l;__[_l_]=_l__l[_[_ll__]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=__l_l[_[_lll]];_l=_l+_ll;_=__l[_l];__[_[_l__]]=_[__lll];_l=_l+_ll;_=__l[_l];__[_[_l__]]=_[_lll];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=_[_llll];_l=_l+_ll;_=__l[_l];_l_=_[__ll]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[__lll]))_l=_l+_ll;_=__l[_l];_l_=_[__l_]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[__lll]))_l=_l+_ll;_=__l[_l];_l_=_[___l];_l__l=__[_[_l_ll]];__[_l_+1]=_l__l;__[_l_]=_l__l[_[_ll__]];_l=_l+_ll;_=__l[_l];__[_[_l__]]=_ll_l[_[___]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_[_llll];_l=_l+_ll;_=__l[_l];_l_=_[_l__]__[_l_](___ll(__,_l_+___l_,_[_llll]))_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_ll_l[_[___]];_l=_l+_ll;_=__l[_l];_l_=_[__ll];_l__l=__[_[___]];__[_l_+1]=_l__l;__[_l_]=_l__l[_[____l]];_l=_l+_ll;_=__l[_l];_l_=_[_l__]__[_l_](__[_l_+___l_])_l=_l+_ll;_=__l[_l];do return end;break end;break;end while(_l_)/(((1442+-0x3a)+-#"How to deobfuscate: function deobfuscate() while true do end; deobfuscate()"))==1769 do _l_=(5006491)while(0x130b/125)<_l__l do _l_-= _l_ __[_[__l_]]=__[_[____]][_[_l_l_]];_l=_l+_ll;_=__l[_l];__[_[___l]]=__l_l[_[____]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=__[_[____]][_[__l__]];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=__[_[_lll]][_[_ll__]];_l=_l+_ll;_=__l[_l];if(__[_[___l]]~=__[_[_ll__]])then _l=_l+___l_;else _l=_[___];end;break end while 2051==(_l_)/((312448/0x80))do if(__[_[__ll]]==__[_[__l__]])then _l=_l+___l_;else _l=_[_lll];end;break end;break;end break;end while 2431==(_l_)/(((1578-0x34f)+-#'kfc obfuscator bad'))do _l_=(6718191)while _l__l<=(0xa5-123)do _l_-= _l_ _l_=(3718912)while(2460/0x3c)<_l__l do _l_-= _l_ local _l_;__[_[_l__]]={};_l=_l+_ll;_=__l[_l];__[_[_l__]]=__l_l[_[____]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_[___];_l=_l+_ll;_=__l[_l];__[_[___l]]=_[_l_ll];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=_[_lll];_l=_l+_ll;_=__l[_l];_l_=_[_l_l]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[_llll]))_l=_l+_ll;_=__l[_l];__[_[__l_]][_[____]]=__[_[_ll__]];_l=_l+_ll;_=__l[_l];__[_[___l]][_[_lll]]=__[_[_ll__]];_l=_l+_ll;_=__l[_l];__[_[__l_]]=__l_l[_[___]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_[_lll];break end while(_l_)/(((1316+-0x75)+-31))==3184 do local _l_;__[_[_l__]][_[___]]=_[_lll_];_l=_l+_ll;_=__l[_l];__[_[__ll]][_[_lll]]=_[_lll_];_l=_l+_ll;_=__l[_l];__[_[__l_]][_[_l_ll]]=_[__ll_];_l=_l+_ll;_=__l[_l];__[_[_l__]][_[__lll]]=_[_l_l_];_l=_l+_ll;_=__l[_l];__[_[_l_l]]={};_l=_l+_ll;_=__l[_l];__[_[___l]]=__l_l[_[_lll]];_l=_l+_ll;_=__l[_l];__[_[___l]]=_[_lll];_l=_l+_ll;_=__l[_l];__[_[_l__]]=_[_lll];_l=_l+_ll;_=__l[_l];__[_[__l_]]=_[____];_l=_l+_ll;_=__l[_l];_l_=_[__l_]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[_lll]))break end;break;end while 2741==(_l_)/(((5040-0xa07)+-#"Telecrypter buggin bro"))do _l_=(4223955)while _l__l<=(0x87-92)do _l_-= _l_ local _l=_[_l__]local __l,_=_lllll(__[_l](___ll(__,_l+1,_[__lll])))_____=_+_l-1 local _=0;for _l=_l,_____ do _=_+_ll;__[_l]=__l[_];end;break;end while(_l_)/((583255/0x9d))==1137 do _l_=(407898)while _l__l>(-0x1e+74)do _l_-= _l_ local _l_lll;local _l__l;local _l___,___lll;local _l_;__[_[___l]]=__l_l[_[___]];_l=_l+_ll;_=__l[_l];__[_[_l__]]=__[_[__lll]];_l=_l+_ll;_=__l[_l];_l_=_[___l]__[_l_]=__[_l_](__[_l_+___l_])_l=_l+_ll;_=__l[_l];__[_[__l_]][_[__lll]]=__[_[____l]];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_ll_l[_[__lll]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=__[_[_llll]][_[_ll__]];_l=_l+_ll;_=__l[_l];__[_[___l]]=__[_[___]][_[__ll_]];_l=_l+_ll;_=__l[_l];__[_[_l_l]][_[____]]=__[_[__ll_]];_l=_l+_ll;_=__l[_l];__[_[__l_]]=_ll_l[_[_lll]];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=__[_[_lll]][_[____l]];_l=_l+_ll;_=__l[_l];__[_[__l_]]=__[_[___]][_[____l]];_l=_l+_ll;_=__l[_l];__[_[_l_l]][_[__lll]]=__[_[____l]];_l=_l+_ll;_=__l[_l];__[_[_l_l]][_[_llll]]=_[____l];_l=_l+_ll;_=__l[_l];__[_[__l_]]=__l_l[_[___]];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=__[_[__lll]][_[__ll_]];_l=_l+_ll;_=__l[_l];__[_[___l]]=_[____];_l=_l+_ll;_=__l[_l];__[_[__l_]]=_[____];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_[___];_l=_l+_ll;_=__l[_l];__[_[___l]]=_[___];_l=_l+_ll;_=__l[_l];_l_=_[_l_l]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[_l_ll]))_l=_l+_ll;_=__l[_l];__[_[__l_]][_[_lll]]=__[_[_ll__]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=__l_l[_[_lll]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=__[_[___]][_[_ll__]];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=_[_lll];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_[____];_l=_l+_ll;_=__l[_l];__[_[___l]]=_[_l_ll];_l=_l+_ll;_=__l[_l];__[_[__l_]]=_[_llll];_l=_l+_ll;_=__l[_l];_l_=_[_l__]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[____]))_l=_l+_ll;_=__l[_l];__[_[___l]][_[_lll]]=__[_[____l]];_l=_l+_ll;_=__l[_l];__[_[__l_]]=_ll_l[_[_lll]];_l=_l+_ll;_=__l[_l];__[_[___l]]=__[_[__lll]][_[_lll_]];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=__[_[_lll]][_[__l__]];_l=_l+_ll;_=__l[_l];__[_[_ll_]][_[_l_ll]]=__[_[__l__]];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_ll_l[_[____]];_l=_l+_ll;_=__l[_l];__[_[_l__]]=__[_[__lll]][_[____l]];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=__[_[__lll]][_[_l_l_]];_l=_l+_ll;_=__l[_l];__[_[__l_]][_[____]]=__[_[_l_l_]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_ll_l[_[_llll]];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=__[_[_lll]][_[_l_l_]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=__[_[_llll]][_[_lll_]];_l=_l+_ll;_=__l[_l];__[_[_ll_]][_[_llll]]=__[_[__l__]];_l=_l+_ll;_=__l[_l];__[_[__l_]]=_ll_l[_[_lll]];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=__[_[_lll]][_[__ll_]];_l=_l+_ll;_=__l[_l];__[_[___l]]=__[_[_llll]][_[__ll_]];_l=_l+_ll;_=__l[_l];__[_[___l]][_[_l_ll]]=__[_[__ll_]];_l=_l+_ll;_=__l[_l];_l_=_[__l_]_l___,___lll=_lllll(__[_l_](___ll(__,_l_+1,_[___])))_____=___lll+_l_-1 _l__l=0;for _=_l_,_____ do _l__l=_l__l+_ll;__[_]=_l___[_l__l];end;_l=_l+_ll;_=__l[_l];_l_=_[__ll];_l_lll=__[_l_];for _=_l_+1,_____ do __llll(_l_lll,__[_])end;break end while 774==(_l_)/((-#[[Your balls]]+(0x236+-29)))do local ___;local _l_;__[_[_ll_]][_[____]]=__[_[_lll_]];_l=_l+_ll;_=__l[_l];_l_=_[_l__];___=__[_[_l_ll]];__[_l_+1]=___;__[_l_]=___[_[____l]];_l=_l+_ll;_=__l[_l];_l_=_[__ll]__[_l_]=__[_l_](__[_l_+___l_])_l=_l+_ll;_=__l[_l];__[_[_l_l]][_[_llll]]=__[_[_lll_]];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_ll_l[_[__lll]];_l=_l+_ll;_=__l[_l];_l_=_[__ll];___=__[_[_l_ll]];__[_l_+1]=___;__[_l_]=___[_[____l]];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_[_llll];_l=_l+_ll;_=__l[_l];__[_[___l]]={};_l=_l+_ll;_=__l[_l];__[_[__l_]][_[____]]=__[_[_lll_]];_l=_l+_ll;_=__l[_l];__[_[___l]]=_[__lll];break end;break;end break;end break;end break;end while 2238==(_l_)/((8061-0xfe2))do _l_=(1758804)while((0x3efe-8090)/0xa4)>=_l__l do _l_-= _l_ _l_=(8445658)while(-0x27+86)>=_l__l do _l_-= _l_ _l_=(6156630)while(168+-0x7a)<_l__l do _l_-= _l_ local _l_;__[_[__ll]]=__[_[_lll]];_l=_l+_ll;_=__l[_l];_l_=_[__l_]__[_l_]=__[_l_](__[_l_+___l_])_l=_l+_ll;_=__l[_l];__[_[_ll_]]=__l_l[_[_llll]];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_[_lll];_l=_l+_ll;_=__l[_l];__[_[__l_]]=_[____];_l=_l+_ll;_=__l[_l];__[_[__l_]]=_[_l_ll];_l=_l+_ll;_=__l[_l];_l_=_[_l_l]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[_llll]))_l=_l+_ll;_=__l[_l];if(__[_[__l_]]~=__[_[_lll_]])then _l=_l+___l_;else _l=_[__lll];end;break end while 2010==(_l_)/((0x35d78/((0x452e/154)+-#'Imagine being named omer faruk birer aka RY')))do local _lll;local _l_;_l_=_[_ll_];_lll=__[_[_llll]];__[_l_+1]=_lll;__[_l_]=_lll[_[__l__]];_l=_l+_ll;_=__l[_l];__[_[_l__]]=__[_[_llll]];_l=_l+_ll;_=__l[_l];_l_=_[_l_l]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[_llll]))_l=_l+_ll;_=__l[_l];for _=_[_l__],_[__lll]do __[_]=nil;end;_l=_l+_ll;_=__l[_l];_l_=_[__l_];_lll=__[_[____]];__[_l_+1]=_lll;__[_l_]=_lll[_[__ll_]];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=__[_[_llll]];_l=_l+_ll;_=__l[_l];_l_=_[_l_l]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[____]))_l=_l+_ll;_=__l[_l];__[_[___l]]=__[_[___]][_[_lll_]];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=__[_[___]][_[__ll_]];_l=_l+_ll;_=__l[_l];_l_=_[_l_l];_lll=__[_[_llll]];__[_l_+1]=_lll;__[_l_]=_lll[_[_lll_]];break end;break;end while 2069==(_l_)/((0xb560c/182))do _l_=(328048)while _l__l>((232-(-0x12+188))+-#'Bye bye :wave:')do _l_-= _l_ __[_[___l]][__[_[__lll]]]=__[_[_lll_]];break end while 232==(_l_)/(((2999-0x613)+-#'psu is powered by garlic paste'))do local _l__;local _l_;_l_=_[_ll_];_l__=__[_[__lll]];__[_l_+1]=_l__;__[_l_]=_l__[_[__ll_]];_l=_l+_ll;_=__l[_l];__[_[__l_]]=_[_llll];_l=_l+_ll;_=__l[_l];__[_[___l]]={};_l=_l+_ll;_=__l[_l];__[_[_ll_]]=__l_l[_[___]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_[_llll];_l=_l+_ll;_=__l[_l];__[_[__l_]]=_[_llll];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_[_l_ll];_l=_l+_ll;_=__l[_l];_l_=_[___l]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[_lll]))_l=_l+_ll;_=__l[_l];__[_[_ll_]][_[_lll]]=__[_[__ll_]];_l=_l+_ll;_=__l[_l];__[_[_l_l]][_[_lll]]=_[_ll__];break end;break;end break;end while(_l_)/((0x20412/227))==3022 do _l_=(607192)while(-#[[Get it bc perth needs to stfu]]+(0x109-185))>=_l__l do _l_-= _l_ _l_=(6444830)while(-#'me waiting for a memestring that isnt about sex or someone being a pedo'+(0xb8+-63))<_l__l do _l_-= _l_ local _lll;local _l__l,____l;local ___l;local _l_;__[_[_ll_]]=__[_[____]][_[__ll_]];_l=_l+_ll;_=__l[_l];__[_[__l_]]=_ll_l[_[____]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=__[_[_l_ll]][_[_l_l_]];_l=_l+_ll;_=__l[_l];_l_=_[_l__];___l=__[_[___]];__[_l_+1]=___l;__[_l_]=___l[_[_l_l_]];_l=_l+_ll;_=__l[_l];__[_[_l__]]=__l_l[_[___]];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=_[___];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_[__lll];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_[_llll];_l=_l+_ll;_=__l[_l];_l_=_[_l__]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[_llll]))_l=_l+_ll;_=__l[_l];_l_=_[_l__]_l__l,____l=_lllll(__[_l_](___ll(__,_l_+1,_[__lll])))_____=____l+_l_-1 _lll=0;for _=_l_,_____ do _lll=_lll+_ll;__[_]=_l__l[_lll];end;_l=_l+_ll;_=__l[_l];_l_=_[_l_l]__[_l_](___ll(__,_l_+___l_,_____))break end while 1610==(_l_)/((0xfb3+-16))do local ___lll;local _l__l;local _l_lll,_l___;local ___l_;local _l_;__[_[_l_l]]=__[_[_lll]][_[_ll__]];_l=_l+_ll;_=__l[_l];__[_[___l]]=__[_[_llll]][_[_l_l_]];_l=_l+_ll;_=__l[_l];__[_[___l]][_[___]]=__[_[____l]];_l=_l+_ll;_=__l[_l];__[_[__l_]][_[____]]=_[_l_l_];_l=_l+_ll;_=__l[_l];__[_[___l]]=_ll_l[_[___]];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=__[_[_lll]][_[__ll_]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=__[_[__lll]][_[____l]];_l=_l+_ll;_=__l[_l];__[_[_l_l]][_[____]]=__[_[_lll_]];_l=_l+_ll;_=__l[_l];__[_[___l]]=_ll_l[_[____]];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=__[_[_llll]][_[_ll__]];_l=_l+_ll;_=__l[_l];__[_[_l__]]=__[_[___]][_[__l__]];_l=_l+_ll;_=__l[_l];__[_[_l_l]][_[___]]=__[_[_l_l_]];_l=_l+_ll;_=__l[_l];__[_[__l_]]=_ll_l[_[_l_ll]];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=__[_[____]][_[____l]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=__[_[___]][_[____l]];_l=_l+_ll;_=__l[_l];__[_[__l_]][_[_lll]]=__[_[_ll__]];_l=_l+_ll;_=__l[_l];__[_[_l__]]=_ll_l[_[_lll]];_l=_l+_ll;_=__l[_l];__[_[_l__]]=__[_[_lll]][_[__l__]];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=__[_[__lll]][_[_ll__]];_l=_l+_ll;_=__l[_l];__[_[__l_]][_[___]]=__[_[_ll__]];_l=_l+_ll;_=__l[_l];_l_=_[_ll_]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[_llll]))_l=_l+_ll;_=__l[_l];__[_[__l_]]=_ll_l[_[____]];_l=_l+_ll;_=__l[_l];_l_=_[__ll];___l_=__[_[_l_ll]];__[_l_+1]=___l_;__[_l_]=___l_[_[____l]];_l=_l+_ll;_=__l[_l];__[_[_l__]]=_[___];_l=_l+_ll;_=__l[_l];__[_[_l__]]={};_l=_l+_ll;_=__l[_l];__[_[___l]]=__l_l[_[____]];_l=_l+_ll;_=__l[_l];__[_[__l_]]=_[__lll];_l=_l+_ll;_=__l[_l];__[_[__l_]]=_[_lll];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=_[____];_l=_l+_ll;_=__l[_l];_l_=_[_l_l]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[__lll]))_l=_l+_ll;_=__l[_l];__[_[__ll]][_[____]]=__[_[_lll_]];_l=_l+_ll;_=__l[_l];__[_[__ll]][_[___]]=_[_lll_];_l=_l+_ll;_=__l[_l];__[_[___l]]=__l_l[_[_l_ll]];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=__[_[____]][_[_l_l_]];_l=_l+_ll;_=__l[_l];__[_[__l_]]=_[_lll];_l=_l+_ll;_=__l[_l];__[_[___l]]=_[__lll];_l=_l+_ll;_=__l[_l];__[_[___l]]=_[___];_l=_l+_ll;_=__l[_l];__[_[__l_]]=_[_l_ll];_l=_l+_ll;_=__l[_l];_l_=_[__l_]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[__lll]))_l=_l+_ll;_=__l[_l];__[_[__ll]][_[__lll]]=__[_[____l]];_l=_l+_ll;_=__l[_l];__[_[___l]]=__l_l[_[__lll]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=__[_[_lll]][_[__ll_]];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_[___];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=_[____];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_[_llll];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_[_llll];_l=_l+_ll;_=__l[_l];_l_=_[_l__]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[___]))_l=_l+_ll;_=__l[_l];__[_[__ll]][_[_lll]]=__[_[_ll__]];_l=_l+_ll;_=__l[_l];__[_[___l]][_[__lll]]=_[__ll_];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_ll_l[_[__lll]];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=__[_[_lll]][_[__l__]];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=__[_[__lll]][_[_lll_]];_l=_l+_ll;_=__l[_l];__[_[__l_]][_[_lll]]=__[_[_l_l_]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_ll_l[_[____]];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=__[_[___]][_[__ll_]];_l=_l+_ll;_=__l[_l];__[_[___l]]=__[_[_l_ll]][_[____l]];_l=_l+_ll;_=__l[_l];__[_[_l_l]][_[___]]=__[_[_lll_]];_l=_l+_ll;_=__l[_l];__[_[___l]]=_ll_l[_[_l_ll]];_l=_l+_ll;_=__l[_l];__[_[___l]]=__[_[____]][_[____l]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=__[_[____]][_[_l_l_]];_l=_l+_ll;_=__l[_l];__[_[___l]][_[_lll]]=__[_[__l__]];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_ll_l[_[_lll]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=__[_[_lll]][_[_lll_]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=__[_[____]][_[____l]];_l=_l+_ll;_=__l[_l];__[_[_ll_]][_[_l_ll]]=__[_[____l]];_l=_l+_ll;_=__l[_l];__[_[_l__]]=_ll_l[_[_lll]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=__[_[__lll]][_[_ll__]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=__[_[_llll]][_[_l_l_]];_l=_l+_ll;_=__l[_l];__[_[_l__]][_[_lll]]=__[_[____l]];_l=_l+_ll;_=__l[_l];_l_=_[_l_l]_l_lll,_l___=_lllll(__[_l_](___ll(__,_l_+1,_[_lll])))_____=_l___+_l_-1 _l__l=0;for _=_l_,_____ do _l__l=_l__l+_ll;__[_]=_l_lll[_l__l];end;_l=_l+_ll;_=__l[_l];_l_=_[___l];___lll=__[_l_];for _=_l_+1,_____ do __llll(___lll,__[_])end;break end;break;end while 284==(_l_)/((17104/0x8))do _l_=(5726640)while(0x2184/165)>=_l__l do _l_-= _l_ local ___=_ll_ll[_[____]];local _l_;local _ll={};_l_=___l_l({},{__index=function(_l,_)local _=_ll[_];return _[1][_[2]];end,__newindex=function(__,_,_l)local _=_ll[_]_[1][_[2]]=_l;end;});for _l_=1,_[__ll_]do _l=_l+___l_;local _=__l[_l];if _[(0x2c-43)]==216 then _ll[_l_-1]={__,_[_lll]};else _ll[_l_-1]={_ll_l,_[_llll]};end;_l_lll[#_l_lll+1]=_ll;end;__[_[__l_]]=___lll(___,_l_,__l_l);break;end while(_l_)/((-59+0xd4c))==1712 do _l_=(11662449)while _l__l>(-0x7a+175)do _l_-= _l_ _l=_[___];break end while 3979==(_l_)/((451374/0x9a))do local _l__l;local _ll_;local _ll_l;local _l_;__[_[_l_l]]=__l_l[_[_lll]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=__[_[_l_ll]][_[_lll_]];_l=_l+_ll;_=__l[_l];_l_=_[__ll];_ll_l=__[_[_llll]];__[_l_+1]=_ll_l;__[_l_]=_ll_l[_[____l]];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=__[_[_llll]];_l=_l+_ll;_=__l[_l];__[_[_l__]]=__[_[___]];_l=_l+_ll;_=__l[_l];_l_=_[___l]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[_llll]))_l=_l+_ll;_=__l[_l];_l_=_[_l_l];_ll_l=__[_[__lll]];__[_l_+1]=_ll_l;__[_l_]=_ll_l[_[_ll__]];_l=_l+_ll;_=__l[_l];_l_=_[_l__]__[_l_]=__[_l_](__[_l_+___l_])_l=_l+_ll;_=__l[_l];_ll_={__,_};_ll_[___l_][_ll_[_l___][___l]]=_ll_[_ll][_ll_[_l___][____l]]+_ll_[___l_][_ll_[_l___][____]];_l=_l+_ll;_=__l[_l];__[_[__l_]]=__[_[_l_ll]]%_[____l];_l=_l+_ll;_=__l[_l];_l_=_[_l__]__[_l_]=__[_l_](__[_l_+___l_])_l=_l+_ll;_=__l[_l];_ll_l=_[_lll];_l__l=__[_ll_l]for _=_ll_l+1,_[__ll_]do _l__l=_l__l..__[_];end;__[_[_l__]]=_l__l;_l=_l+_ll;_=__l[_l];_ll_={__,_};_ll_[___l_][_ll_[_l___][_l_l]]=_ll_[_ll][_ll_[_l___][__l__]]+_ll_[___l_][_ll_[_l___][___]];_l=_l+_ll;_=__l[_l];__[_[__l_]]=__[_[_lll]]%_[__ll_];break end;break;end break;end break;end break;end break;end while(_l_)/((((0x148c-2676)+-0x29)+-#"protected by Federal Scripting Utilities"))==1355 do _l_=(9357257)while _l__l<=(0x7d+-62)do _l_-= _l_ _l_=(8448894)while _l__l<=(0xa9+-111)do _l_-= _l_ _l_=(7505190)while(188-0x84)>=_l__l do _l_-= _l_ _l_=(2647744)while(0xc2-(166+-0x1b))<_l__l do _l_-= _l_ __[_[_ll_]]={};break end while 704==(_l_)/((0xef6+-69))do local _l__l;local _ll__;local _ll_l;local _l___;local ____l;local _l_;_l_=_[__ll]__[_l_](___ll(__,_l_+___l_,_[_l_ll]))_l=_l+_ll;_=__l[_l];_l_=_[__l_];____l={};for _=1,#_l_lll do _l___=_l_lll[_];for _=0,#_l___ do _ll_l=_l___[_];_ll__=_ll_l[1];_l__l=_ll_l[2];if _ll__==__ and _l__l>=_l_ then ____l[_l__l]=_ll__[_l__l];_ll_l[1]=____l;end;end;end;_l=_l+_ll;_=__l[_l];__[_[_l__]]={};_l=_l+_ll;_=__l[_l];__[_[__ll]]=__l_l[_[___]];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_[____];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=_[___];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_[__lll];_l=_l+_ll;_=__l[_l];_l_=_[__l_]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[____]))_l=_l+_ll;_=__l[_l];__[_[_ll_]][__[_[___]]]=_[_lll_];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=__l_l[_[____]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_[__lll];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_[_l_ll];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=_[_llll];_l=_l+_ll;_=__l[_l];_l_=_[___l]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[____]))_l=_l+_ll;_=__l[_l];__[_[__ll]]={};_l=_l+_ll;_=__l[_l];__[_[_l__]]={};_l=_l+_ll;_=__l[_l];__[_[__l_]]=__l_l[_[_llll]];_l=_l+_ll;_=__l[_l];__[_[_l__]]=_[_llll];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=_[___];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_[__lll];_l=_l+_ll;_=__l[_l];_l_=_[_ll_]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[____]))_l=_l+_ll;_=__l[_l];__[_[___l]]=__l_l[_[_lll]];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_[___];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=_[_l_ll];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=_[___];_l=_l+_ll;_=__l[_l];_l_=_[_l__]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[_llll]))_l=_l+_ll;_=__l[_l];__[_[__ll]][__[_[___]]]=__[_[_l_l_]];_l=_l+_ll;_=__l[_l];__[_[___l]]=__l_l[_[_lll]];_l=_l+_ll;_=__l[_l];__[_[__l_]]=_[__lll];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_[____];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_[_lll];_l=_l+_ll;_=__l[_l];_l_=_[_ll_]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[_llll]))_l=_l+_ll;_=__l[_l];__[_[_l__]]=__l_l[_[_llll]];_l=_l+_ll;_=__l[_l];__[_[__l_]]=_[_l_ll];_l=_l+_ll;_=__l[_l];__[_[___l]]=_[___];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_[_lll];_l=_l+_ll;_=__l[_l];_l_=_[_ll_]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[____]))_l=_l+_ll;_=__l[_l];__[_[_ll_]][__[_[_lll]]]=__[_[__ll_]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=__l_l[_[_l_ll]];_l=_l+_ll;_=__l[_l];__[_[_l__]]=_[_lll];_l=_l+_ll;_=__l[_l];__[_[_l__]]=_[_l_ll];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_[___];_l=_l+_ll;_=__l[_l];_l_=_[___l]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[_lll]))_l=_l+_ll;_=__l[_l];__[_[_ll_]]=__l_l[_[___]];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_[__lll];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_[____];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_[____];_l=_l+_ll;_=__l[_l];_l_=_[_l_l]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[____]))_l=_l+_ll;_=__l[_l];__[_[___l]][__[_[_llll]]]=__[_[__l__]];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=__l_l[_[____]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_[_llll];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=_[_lll];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_[__lll];_l=_l+_ll;_=__l[_l];_l_=_[___l]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[_l_ll]))_l=_l+_ll;_=__l[_l];__[_[__l_]]=__l_l[_[_lll]];_l=_l+_ll;_=__l[_l];__[_[_l__]]=_[_lll];_l=_l+_ll;_=__l[_l];_l_=_[__ll]__[_l_]=__[_l_](__[_l_+___l_])_l=_l+_ll;_=__l[_l];__[_[__l_]][__[_[__lll]]]=__[_[__l__]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=__l_l[_[_llll]];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=_[_l_ll];_l=_l+_ll;_=__l[_l];__[_[_l__]]=_[____];_l=_l+_ll;_=__l[_l];__[_[__l_]]=_[____];_l=_l+_ll;_=__l[_l];_l_=_[_ll_]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[_l_ll]))_l=_l+_ll;_=__l[_l];__[_[__l_]]={};_l=_l+_ll;_=__l[_l];__[_[__ll]]={};_l=_l+_ll;_=__l[_l];__[_[_ll_]]=__l_l[_[_l_ll]];_l=_l+_ll;_=__l[_l];__[_[___l]]=_[____];_l=_l+_ll;_=__l[_l];__[_[__l_]]=_[_lll];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_[_llll];_l=_l+_ll;_=__l[_l];_l_=_[_l__]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[__lll]))_l=_l+_ll;_=__l[_l];__[_[_ll_]]=__l_l[_[___]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_[___];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_[_l_ll];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=_[___];_l=_l+_ll;_=__l[_l];_l_=_[_l__]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[__lll]))_l=_l+_ll;_=__l[_l];__[_[_ll_]][__[_[____]]]=__[_[__l__]];_l=_l+_ll;_=__l[_l];__[_[_l__]]=__l_l[_[_lll]];_l=_l+_ll;_=__l[_l];__[_[___l]]=_[__lll];_l=_l+_ll;_=__l[_l];__[_[__l_]]=_[_l_ll];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_[_l_ll];break end;break;end while 1881==(_l_)/(((0x13685c/158)-0xfdc))do _l_=(1541775)while _l__l>(0x14b5/93)do _l_-= _l_ local _l_;_l_=_[___l]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[_llll]))_l=_l+_ll;_=__l[_l];__[_[___l]][_[_l_ll]]=__[_[____l]];_l=_l+_ll;_=__l[_l];__[_[_ll_]][_[____]]=__[_[_lll_]];_l=_l+_ll;_=__l[_l];__[_[_ll_]][_[_llll]]=_[_lll_];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_ll_l[_[_lll]];_l=_l+_ll;_=__l[_l];__[_[___l]]=__[_[___]][_[__l__]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=__[_[__lll]][_[____l]];_l=_l+_ll;_=__l[_l];__[_[___l]][_[____]]=__[_[____l]];_l=_l+_ll;_=__l[_l];__[_[___l]]=__l_l[_[_l_ll]];break end while(_l_)/((0xd9d-1800))==915 do if(_[__l_]<__[_[_lll_]])then _l=_l+___l_;else _l=_[____];end;break end;break;end break;end while 3226==(_l_)/((-#'stOP READING MY CODE!'+(0xab3+-99)))do _l_=(2089164)while _l__l<=(-0x18+84)do _l_-= _l_ _l_=(3113404)while _l__l>(2065/0x23)do _l_-= _l_ local ___;local _l_;_l_=_[_l__];___=__[_[_llll]];__[_l_+1]=___;__[_l_]=___[_[__ll_]];_l=_l+_ll;_=__l[_l];__[_[___l]]=__l_l[_[_llll]];_l=_l+_ll;_=__l[_l];__[_[_l__]]=_[_lll];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=_[____];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_[__lll];_l=_l+_ll;_=__l[_l];_l_=_[___l]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[_llll]))_l=_l+_ll;_=__l[_l];_l_=_[__l_]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[_lll]))_l=_l+_ll;_=__l[_l];__[_[_l_l]]=__l_l[_[_lll]];_l=_l+_ll;_=__l[_l];_l_=_[__ll];___=__[_[__lll]];__[_l_+1]=___;__[_l_]=___[_[____l]];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=__l_l[_[_l_ll]];break end while 1004==(_l_)/((0xa7509/(0x13e+-97)))do local _l__l;local _l_;_l_=_[__l_];_l__l=__[_[_l_ll]];__[_l_+1]=_l__l;__[_l_]=_l__l[_[__l__]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=__l_l[_[_lll]];_l=_l+_ll;_=__l[_l];__[_[__l_]]=_[___];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_[___];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_[_llll];_l=_l+_ll;_=__l[_l];_l_=_[_l__]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[__lll]))_l=_l+_ll;_=__l[_l];_l_=_[_ll_]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[___]))_l=_l+_ll;_=__l[_l];_l_=_[_l__];_l__l=__[_[__lll]];__[_l_+1]=_l__l;__[_l_]=_l__l[_[__l__]];_l=_l+_ll;_=__l[_l];__[_[_l__]]=__l_l[_[__lll]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_[_lll];_l=_l+_ll;_=__l[_l];__[_[_l__]]=_[__lll];_l=_l+_ll;_=__l[_l];__[_[___l]]=_[_llll];_l=_l+_ll;_=__l[_l];_l_=_[___l]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[___]))_l=_l+_ll;_=__l[_l];_l_=_[_ll_]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[_llll]))_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_ll_l[_[____]];_l=_l+_ll;_=__l[_l];__[_[___l]]=__[_[_lll]][_[__l__]];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=__[_[___]][_[__l__]];_l=_l+_ll;_=__l[_l];__[_[__ll]][_[_llll]]=__[_[_lll_]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_ll_l[_[__lll]];_l=_l+_ll;_=__l[_l];_l_=_[_l_l];_l__l=__[_[_l_ll]];__[_l_+1]=_l__l;__[_l_]=_l__l[_[_ll__]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=__l_l[_[_l_ll]];_l=_l+_ll;_=__l[_l];__[_[___l]]=_[__lll];_l=_l+_ll;_=__l[_l];__[_[_l__]]=_[_lll];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_[_lll];_l=_l+_ll;_=__l[_l];_l_=_[_l__]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[__lll]))_l=_l+_ll;_=__l[_l];_l_=_[_l_l]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[___]))_l=_l+_ll;_=__l[_l];_l_=_[_ll_];_l__l=__[_[__lll]];__[_l_+1]=_l__l;__[_l_]=_l__l[_[__ll_]];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=__l_l[_[_lll]];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=_[_llll];_l=_l+_ll;_=__l[_l];__[_[_l__]]=_[__lll];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_[____];_l=_l+_ll;_=__l[_l];_l_=_[_ll_]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[_llll]))_l=_l+_ll;_=__l[_l];_l_=_[__ll]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[___]))_l=_l+_ll;_=__l[_l];__[_[_l_l]]=_ll_l[_[_l_ll]];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=_ll_l[_[_llll]];_l=_l+_ll;_=__l[_l];__[_[_l__]]=__[_[_llll]][__[_[__l__]]];_l=_l+_ll;_=__l[_l];__[_[__l_]][_[_lll]]=__[_[____l]];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=_ll_l[_[____]];_l=_l+_ll;_=__l[_l];_l_=_[__ll];_l__l=__[_[_l_ll]];__[_l_+1]=_l__l;__[_l_]=_l__l[_[_ll__]];_l=_l+_ll;_=__l[_l];__[_[___l]]=__l_l[_[_llll]];_l=_l+_ll;_=__l[_l];__[_[___l]]=__[_[___]][_[_ll__]];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=_[__lll];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_[____];_l=_l+_ll;_=__l[_l];__[_[__l_]]=_[_llll];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=_[_llll];_l=_l+_ll;_=__l[_l];_l_=_[_ll_]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[_l_ll]))_l=_l+_ll;_=__l[_l];__[_[__ll]]=_[___];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=__l_l[_[__lll]];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_[_llll];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_[_l_ll];_l=_l+_ll;_=__l[_l];__[_[___l]]=_[__lll];_l=_l+_ll;_=__l[_l];_l_=_[_l__]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[__lll]))_l=_l+_ll;_=__l[_l];__[_[___l]]=_[_l_ll];_l=_l+_ll;_=__l[_l];__[_[__ll]]=(_[___]~=0);_l=_l+_ll;_=__l[_l];_l_=_[_ll_]__[_l_](___ll(__,_l_+___l_,_[_llll]))_l=_l+_ll;_=__l[_l];__[_[___l]]=__l_l[_[_lll]];_l=_l+_ll;_=__l[_l];__[_[___l]]=_[__lll];_l=_l+_ll;_=__l[_l];_l_=_[___l]__[_l_](__[_l_+___l_])_l=_l+_ll;_=__l[_l];__[_[_l_l]]=__l_l[_[____]];_l=_l+_ll;_=__l[_l];_l_=_[___l];_l__l=__[_[_llll]];__[_l_+1]=_l__l;__[_l_]=_l__l[_[_l_l_]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=__l_l[_[___]];_l=_l+_ll;_=__l[_l];__[_[___l]]=_[_l_ll];_l=_l+_ll;_=__l[_l];__[_[__l_]]=_[_l_ll];_l=_l+_ll;_=__l[_l];__[_[___l]]=_[___];_l=_l+_ll;_=__l[_l];_l_=_[_l__]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[_llll]))_l=_l+_ll;_=__l[_l];_l_=_[_l__]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[___]))_l=_l+_ll;_=__l[_l];_l_=_[_ll_];_l__l=__[_[_l_ll]];__[_l_+1]=_l__l;__[_l_]=_l__l[_[____l]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_ll_l[_[__lll]];_l=_l+_ll;_=__l[_l];__[_[___l]]=_[_lll];_l=_l+_ll;_=__l[_l];_l_=_[_l__]__[_l_](___ll(__,_l_+___l_,_[____]))_l=_l+_ll;_=__l[_l];__[_[__l_]]=_ll_l[_[_llll]];_l=_l+_ll;_=__l[_l];_l_=_[_l_l];_l__l=__[_[_llll]];__[_l_+1]=_l__l;__[_l_]=_l__l[_[__l__]];_l=_l+_ll;_=__l[_l];_l_=_[__ll]__[_l_](__[_l_+___l_])break end;break;end while 3927==(_l_)/((629+(-38+-0x3b)))do _l_=(2252135)while _l__l<=((0x18c-246)+-#[[Fun fact if you ping everyone in this channel you will ping everyone without having perms]])do _l_-= _l_ local _l_;local _lll;_lll=_[_l_l];_l_=__[_[_llll]];__[_lll+1]=_l_;__[_lll]=_l_[_[_lll_]];_l=_l+_ll;_=__l[_l];__[_[_l__]]=_[___];_l=_l+_ll;_=__l[_l];__[_[_ll_]]={};_l=_l+_ll;_=__l[_l];__[_[__l_]][_[___]]=_[__ll_];_l=_l+_ll;_=__l[_l];__[_[___l]]=__l_l[_[____]];break;end while(_l_)/((-0x54+3107))==745 do _l_=(2509150)while _l__l>(183-0x79)do _l_-= _l_ if(_[_ll_]<__[_[__ll_]])then _l=_l+___l_;else _l=_[_llll];end;break end while 2675==(_l_)/((158522/(-#'cry about it'+(232+-0x33))))do local _=_[___l]__[_]=__[_]()break end;break;end break;end break;end break;end while(_l_)/((6720-0xd4b))==2821 do _l_=(7130970)while _l__l<=(0x1694/85)do _l_-= _l_ _l_=(8914444)while(0x9d-92)>=_l__l do _l_-= _l_ _l_=(1753335)while _l__l>((0x14a-220)+-#'OFFICER SHE WAS 18 IN DOG YEARS nice booba btw')do _l_-= _l_ local _llll;local _l_;_l_=_[__l_];_llll=__[_[____]];__[_l_+1]=_llll;__[_l_]=_llll[_[_l_l_]];_l=_l+_ll;_=__l[_l];__[_[_l__]]=__l_l[_[___]];_l=_l+_ll;_=__l[_l];__[_[__l_]]=_[_lll];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_[__lll];_l=_l+_ll;_=__l[_l];__[_[___l]]=_[__lll];_l=_l+_ll;_=__l[_l];_l_=_[__ll]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[_lll]))_l=_l+_ll;_=__l[_l];_l_=_[_l__]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[____]))_l=_l+_ll;_=__l[_l];__[_[_l__]]=__[_[____]][_[__ll_]];_l=_l+_ll;_=__l[_l];for _=_[_l_l],_[_l_ll]do __[_]=nil;end;_l=_l+_ll;_=__l[_l];__[_[_ll_]]=__[_[____]][_[_l_l_]];_l=_l+_ll;_=__l[_l];_l_=_[__ll];_llll=__[_[_lll]];__[_l_+1]=_llll;__[_l_]=_llll[_[__ll_]];break end while 705==(_l_)/((-0x7f+2614))do local _=_[_l_l];local _l=__[_];for _=_+1,_____ do __llll(_l,__[_])end;break end;break;end while(_l_)/((0xfb0+-82))==2266 do _l_=(1092300)while((0x3778/100)+-#'we dont give owner for feet pics what the fuck stop sending me your feet BRO')>=_l__l do _l_-= _l_ local _=_[___l]__[_](___ll(__,_+___l_,_____))break;end while(_l_)/((0x7fd-1052))==1100 do _l_=(12159840)while(-#[[I kissed wally irl]]+(114+-0x1d))<_l__l do _l_-= _l_ local _l=_[___l];local _ll=__[_[_llll]];__[_l+1]=_ll;__[_l]=_ll[_[_lll_]];break end while(_l_)/((0xcc3+-33))==3760 do local _l__l;local _l_;_l_=_[__ll];_l__l=__[_[_l_ll]];__[_l_+1]=_l__l;__[_l_]=_l__l[_[_lll_]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_[____];_l=_l+_ll;_=__l[_l];_l_=_[__ll]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[_llll]))_l=_l+_ll;_=__l[_l];__[_[___l]]=__[_[_l_ll]][_[__l__]];_l=_l+_ll;_=__l[_l];_l_=_[__l_];_l__l=__[_[____]];__[_l_+1]=_l__l;__[_l_]=_l__l[_[__l__]];_l=_l+_ll;_=__l[_l];__[_[_l__]]=__l_l[_[_lll]];_l=_l+_ll;_=__l[_l];__[_[___l]]=__[_[___]][_[____l]];_l=_l+_ll;_=__l[_l];__[_[__l_]]=_[__lll];_l=_l+_ll;_=__l[_l];__[_[__l_]]=_[_llll];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_[_llll];_l=_l+_ll;_=__l[_l];__[_[_l__]]=__[_[_llll]];_l=_l+_ll;_=__l[_l];_l_=_[_l__]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[_l_ll]))_l=_l+_ll;_=__l[_l];__[_[_l__]]=_[___];_l=_l+_ll;_=__l[_l];__[_[__ll]]=__l_l[_[_llll]];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=_[_llll];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_[_lll];_l=_l+_ll;_=__l[_l];__[_[_l__]]=_[____];_l=_l+_ll;_=__l[_l];_l_=_[_ll_]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[___]))_l=_l+_ll;_=__l[_l];__[_[__l_]]=_[_llll];_l=_l+_ll;_=__l[_l];__[_[__l_]]=(_[__lll]~=0);_l=_l+_ll;_=__l[_l];_l_=_[__l_]__[_l_](___ll(__,_l_+___l_,_[_llll]))_l=_l+_ll;_=__l[_l];__[_[_l__]]=_ll_l[_[___]];_l=_l+_ll;_=__l[_l];_l_=_[_l_l];_l__l=__[_[_l_ll]];__[_l_+1]=_l__l;__[_l_]=_l__l[_[_ll__]];_l=_l+_ll;_=__l[_l];__[_[___l]]=_[_llll];_l=_l+_ll;_=__l[_l];_l_=_[__ll]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[_l_ll]))_l=_l+_ll;_=__l[_l];__[_[___l]]=__[_[_lll]][_[__ll_]];_l=_l+_ll;_=__l[_l];__[_[__l_]]=__l_l[_[___]];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=__[_[_llll]][_[__ll_]];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_[_lll];_l=_l+_ll;_=__l[_l];__[_[_l__]]=_[__lll];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_[_llll];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=#__[_[_llll]];_l=_l+_ll;_=__l[_l];__[_[___l]]=_[_lll]*__[_[_l_l_]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=__[_[_llll]]-_[_lll_];_l=_l+_ll;_=__l[_l];_l_=_[_ll_]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[__lll]))_l=_l+_ll;_=__l[_l];__[_[__l_]][_[_lll]]=__[_[__l__]];_l=_l+_ll;_=__l[_l];do return end;break end;break;end break;end break;end while 2079==(_l_)/(((0x1b44+-61)-3489))do _l_=(829980)while _l__l<=(-#'True'+((258+-0x4e)-0x6a))do _l_-= _l_ _l_=(6203906)while(-89+0x9e)<_l__l do _l_-= _l_ local _l_l;local __lll;local _llll;local _l_;__[_[__ll]]();_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_[_l_ll];_l=_l+_ll;_=__l[_l];__[_[___l]]=__l_l[_[_l_ll]];_l=_l+_ll;_=__l[_l];__[_[_l__]]=_ll_l[_[___]];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=__[_[___]][_[_lll_]];_l=_l+_ll;_=__l[_l];_l_=_[_ll_];_llll=__[_[_lll]];__[_l_+1]=_llll;__[_l_]=_llll[_[_l_l_]];_l=_l+_ll;_=__l[_l];_l_=_[__l_]__lll={__[_l_](__[_l_+1])};_l_l=0;for _=_l_,_[_ll__]do _l_l=_l_l+_ll;__[_]=__lll[_l_l];end _l=_l+_ll;_=__l[_l];_l=_[____];break end while 2129==(_l_)/((5905-0xbaf))do if(__[_[__l_]]<=__[_[__ll_]])then _l=_[_llll];else _l=_l+___l_;end;break end;break;end while 3180==(_l_)/((-#"Perth sent his vagina to a 9 year old real!!!"+(348+-0x2a)))do _l_=(2069042)while((104+-0x19)+-#[[Invented]])>=_l__l do _l_-= _l_ _l=_[_lll];break;end while(_l_)/(((0xbb1-(295176/0xc4))+-#"this file was obfuscated manually"))==1423 do _l_=(7600755)while _l__l>(-81+0x99)do _l_-= _l_ local _ll_;local _l_;__[_[_l_l]]=__l_l[_[_l_ll]];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=__[_[___]][_[_ll__]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_[_lll];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=_[__lll];_l=_l+_ll;_=__l[_l];__[_[_l__]]=_[__lll];_l=_l+_ll;_=__l[_l];_l_={_,__};_l_[_l___][_l_[___l_][__l_]]=_l_[_l___][_l_[_ll][___]]+_l_[___l_][_lll_];_l=_l+_ll;_=__l[_l];_ll_=_[___l]__[_ll_]=__[_ll_](___ll(__,_ll_+_ll,_[_l_ll]))_l=_l+_ll;_=__l[_l];__[_[___l]][_[___]]=__[_[__ll_]];_l=_l+_ll;_=__l[_l];do return end;break end while(_l_)/((0xa6b+-72))==2929 do local _l__l;local _l_;__[_[___l]]=_[___];_l=_l+_ll;_=__l[_l];__[_[___l]]={};_l=_l+_ll;_=__l[_l];__[_[_l__]]=__l_l[_[___]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=__[_[_l_ll]][_[__ll_]];_l=_l+_ll;_=__l[_l];__[_[___l]]=_[____];_l=_l+_ll;_=__l[_l];__[_[___l]]=_[_l_ll];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=_[____];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_[___];_l=_l+_ll;_=__l[_l];_l_=_[_l_l]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[_l_ll]))_l=_l+_ll;_=__l[_l];__[_[_l_l]][_[_l_ll]]=__[_[__ll_]];_l=_l+_ll;_=__l[_l];__[_[__l_]]=__l_l[_[_l_ll]];_l=_l+_ll;_=__l[_l];__[_[_l__]]=__[_[____]][_[____l]];_l=_l+_ll;_=__l[_l];__[_[_l__]]=_[_llll];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_[_llll];_l=_l+_ll;_=__l[_l];__[_[___l]]=_[___];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=_[__lll];_l=_l+_ll;_=__l[_l];_l_=_[__l_]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[___]))_l=_l+_ll;_=__l[_l];__[_[_ll_]][_[_lll]]=__[_[____l]];_l=_l+_ll;_=__l[_l];__[_[__ll]][_[_l_ll]]=_[_lll_];_l=_l+_ll;_=__l[_l];__[_[___l]][_[___]]=_[_l_l_];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=__[_[_l_ll]][_[_lll_]];_l=_l+_ll;_=__l[_l];__[_[__l_]][_[_l_ll]]=__[_[_l_l_]];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=__[_[____]][_[____l]];_l=_l+_ll;_=__l[_l];__[_[_l_l]][_[_llll]]=__[_[_l_l_]];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=__l_l[_[_llll]];_l=_l+_ll;_=__l[_l];__[_[_l__]]=_[____];_l=_l+_ll;_=__l[_l];__[_[___l]]=_[__lll];_l=_l+_ll;_=__l[_l];__[_[_l__]]=_[__lll];_l=_l+_ll;_=__l[_l];_l_=_[___l]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[____]))_l=_l+_ll;_=__l[_l];__[_[_ll_]][_[____]]=__[_[_lll_]];_l=_l+_ll;_=__l[_l];__[_[___l]]=__[_[_l_ll]][_[_lll_]];_l=_l+_ll;_=__l[_l];__[_[_l__]][_[_llll]]=__[_[_ll__]];_l=_l+_ll;_=__l[_l];__[_[___l]]=_ll_l[_[____]];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=__[_[___]][_[_l_l_]];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=__[_[_lll]][_[_lll_]];_l=_l+_ll;_=__l[_l];__[_[_l__]][_[_lll]]=__[_[__l__]];_l=_l+_ll;_=__l[_l];__[_[__l_]]=_ll_l[_[____]];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=__[_[____]][_[_lll_]];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=__[_[__lll]][_[__l__]];_l=_l+_ll;_=__l[_l];__[_[_l_l]][_[_llll]]=__[_[_l_l_]];_l=_l+_ll;_=__l[_l];__[_[_ll_]][_[____]]=_[__l__];_l=_l+_ll;_=__l[_l];_l_=_[__ll]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[_llll]))_l=_l+_ll;_=__l[_l];__[_[__l_]]=_ll_l[_[__lll]];_l=_l+_ll;_=__l[_l];_l_=_[___l];_l__l=__[_[_l_ll]];__[_l_+1]=_l__l;__[_l_]=_l__l[_[_ll__]];_l=_l+_ll;_=__l[_l];__[_[__ll]]=_[___];_l=_l+_ll;_=__l[_l];__[_[___l]]={};_l=_l+_ll;_=__l[_l];__[_[_l_l]]=__l_l[_[___]];_l=_l+_ll;_=__l[_l];__[_[___l]]=_[___];_l=_l+_ll;_=__l[_l];__[_[___l]]=_[_llll];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=_[__lll];_l=_l+_ll;_=__l[_l];_l_=_[__ll]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[_lll]))_l=_l+_ll;_=__l[_l];__[_[_ll_]][_[_lll]]=__[_[_ll__]];_l=_l+_ll;_=__l[_l];__[_[__l_]]=__l_l[_[_l_ll]];_l=_l+_ll;_=__l[_l];__[_[__l_]]=__[_[____]][_[_l_l_]];_l=_l+_ll;_=__l[_l];__[_[___l]]=_[____];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=_[___];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=_[____];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_[_lll];_l=_l+_ll;_=__l[_l];_l_=_[___l]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[_lll]))_l=_l+_ll;_=__l[_l];__[_[__ll]][_[_lll]]=__[_[____l]];_l=_l+_ll;_=__l[_l];__[_[_l__]]=__l_l[_[_lll]];_l=_l+_ll;_=__l[_l];__[_[___l]]=__[_[__lll]][_[__ll_]];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=_[__lll];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=_[_llll];_l=_l+_ll;_=__l[_l];__[_[__l_]]=_[_lll];_l=_l+_ll;_=__l[_l];__[_[___l]]=_[____];_l=_l+_ll;_=__l[_l];_l_=_[_ll_]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[____]))_l=_l+_ll;_=__l[_l];__[_[__l_]][_[___]]=__[_[_l_l_]];_l=_l+_ll;_=__l[_l];__[_[__l_]]=__[_[_l_ll]][_[____l]];_l=_l+_ll;_=__l[_l];__[_[_l_l]]=__l_l[_[_l_ll]];_l=_l+_ll;_=__l[_l];__[_[___l]]=_[___];_l=_l+_ll;_=__l[_l];__[_[_ll_]]=_[_llll];_l=_l+_ll;_=__l[_l];__[_[__l_]]=_[_l_ll];_l=_l+_ll;_=__l[_l];_l_=_[__l_]__[_l_]=__[_l_](___ll(__,_l_+_ll,_[__lll]))_l=_l+_ll;_=__l[_l];if(__[_[___l]]~=__[_[_ll__]])then _l=_l+___l_;else _l=_[__lll];end;break end;break;end 
+return library
